@@ -1,6 +1,6 @@
-#  ComplyTools - Core Backend
+#  Security - Core Backend
 
-Este repositorio contiene la API principal del ecosistema ComplyTools. Está construido con **Kotlin y Spring Boot**, siguiendo una Arquitectura Hexagonal.
+Este repositorio contiene la API principal del ecosistema Security. Está construido con **Kotlin y Spring Boot**, siguiendo una Arquitectura Hexagonal.
 
 ---
 

@@ -36,5 +36,8 @@ out/
 ### VS Code ###
 .vscode/
 
+### Claude Code (config local de maquina, no portable) ###
+.claude/
+
 ### Kotlin ###
 .kotlin

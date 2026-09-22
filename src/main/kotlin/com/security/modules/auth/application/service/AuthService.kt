@@ -71,7 +71,7 @@ class AuthService(
             throw BadCredentialsException("La contraseña actual es incorrecta")
         }
 
-        usuario.clave = passwordEncoder.encode(nuevaClave)
+        usuario.clave   = passwordEncoder.encode(nuevaClave)
         usuarioRepository.save(usuario)
     }
 

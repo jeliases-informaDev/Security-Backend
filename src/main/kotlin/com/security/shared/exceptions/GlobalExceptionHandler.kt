@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -54,6 +55,23 @@ class GlobalExceptionHandler {
         return buildResponse(
             status = HttpStatus.UNAUTHORIZED,
             message = "Sesión inválida",
+            request = request
+        )
+    }
+
+    // 403 - Autenticado pero sin el rol/permiso requerido (@PreAuthorize).
+    // Se maneja acá y no solo en RestAccessDeniedHandler porque este @RestControllerAdvice
+    // intercepta la excepción dentro del ciclo de DispatcherServlet, antes de que pueda
+    // propagarse hasta el ExceptionTranslationFilter de la cadena de Spring Security.
+    @ExceptionHandler(AccessDeniedException::class)
+    fun handleAccessDenied(
+        ex: AccessDeniedException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.FORBIDDEN,
+            message = "No tiene permisos para acceder a este recurso",
             request = request
         )
     }

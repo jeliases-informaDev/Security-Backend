@@ -1,5 +1,6 @@
-package com.security.shared.datos.entities
+package com.security.modules.auth.domain
 
+import com.security.shared.datos.entities.Usuario
 import jakarta.persistence.*
 import java.time.LocalDateTime
 

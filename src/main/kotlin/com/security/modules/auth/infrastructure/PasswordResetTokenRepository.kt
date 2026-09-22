@@ -1,6 +1,6 @@
-package com.security.shared.datos.repositories
+package com.security.modules.auth.infrastructure
 
-import com.security.shared.datos.entities.PasswordResetToken
+import com.security.modules.auth.domain.PasswordResetToken
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query

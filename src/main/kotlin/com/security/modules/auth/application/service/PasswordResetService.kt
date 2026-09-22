@@ -1,7 +1,7 @@
 package com.security.modules.auth.application.service
 
-import com.security.shared.datos.entities.PasswordResetToken
-import com.security.shared.datos.repositories.PasswordResetTokenRepository
+import com.security.modules.auth.domain.PasswordResetToken
+import com.security.modules.auth.infrastructure.PasswordResetTokenRepository
 import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.exceptions.InvalidTokenException
 import org.springframework.security.crypto.password.PasswordEncoder

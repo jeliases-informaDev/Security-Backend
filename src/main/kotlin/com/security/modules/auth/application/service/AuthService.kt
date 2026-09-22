@@ -7,6 +7,7 @@ import com.security.modules.auth.security.JwtService
 import com.security.shared.datos.entities.Usuario
 import com.security.shared.datos.repositories.UsuarioRepository
 import org.springframework.security.authentication.BadCredentialsException
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
@@ -42,10 +43,10 @@ class AuthService(
             throw BadCredentialsException("Usuario o contraseña incorrectos")
         }
 
-        val token = jwtService.generateToken(usuario)
-
         val rol = usuario.roles.firstOrNull()?.rol
             ?: throw BadCredentialsException("El usuario no tiene un rol asignado")
+
+        val token = jwtService.generateToken(usuario)
 
         return LoginResponse(
             accessToken = token,
@@ -58,6 +59,36 @@ class AuthService(
                 codigo = rol.codigo,
                 rol = rol.nombre
             )
+        )
+    }
+
+    fun cambiarClave(username: String, claveActual: String, nuevaClave: String) {
+
+        val usuario = usuarioRepository.findByUsuario(username)
+            ?: throw UsernameNotFoundException("Usuario no encontrado")
+
+        if (!passwordEncoder.matches(claveActual, usuario.clave)) {
+            throw BadCredentialsException("La contraseña actual es incorrecta")
+        }
+
+        usuario.clave = passwordEncoder.encode(nuevaClave)
+        usuarioRepository.save(usuario)
+    }
+
+    fun me(username: String): UsuarioLoginResponse {
+
+        val usuario = usuarioRepository.findByUsuario(username)
+            ?: throw UsernameNotFoundException("Usuario no encontrado")
+
+        val rol = usuario.roles.firstOrNull()?.rol
+            ?: throw BadCredentialsException("El usuario no tiene un rol asignado")
+
+        return UsuarioLoginResponse(
+            nombreCompleto = listOfNotNull(usuario.nombres, usuario.apePat, usuario.apeMat)
+                .joinToString(" "),
+            usuario = usuario.usuario,
+            codigo = rol.codigo,
+            rol = rol.nombre
         )
     }
 

@@ -55,7 +55,7 @@ class PasswordResetService(
         }
 
         val usuario = resetToken.usuario
-        usuario.clave = passwordEncoder.encode(nuevaClave)
+        usuario.clave = passwordEncoder.encode(nuevaClave)!!
         usuario.fechaActualizacion = LocalDateTime.now()
         usuarioRepository.save(usuario)
 

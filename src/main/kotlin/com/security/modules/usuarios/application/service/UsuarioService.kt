@@ -44,7 +44,7 @@ class UsuarioService(
 
         val usuario = Usuario(
             usuario = request.usuario,
-            clave = passwordEncoder.encode(request.clave),
+            clave = passwordEncoder.encode(request.clave)!!,
             correo = request.correo,
             nombres = request.nombres,
             apePat = request.apePat,

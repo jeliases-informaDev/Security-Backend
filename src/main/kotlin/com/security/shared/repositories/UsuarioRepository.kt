@@ -17,4 +17,19 @@ interface UsuarioRepository : JpaRepository<Usuario, Int> {
     WHERE u.usuario = :usuario
 """)
     fun findByUsuario(@Param("usuario") usuario: String): Usuario?
+
+    fun findByCorreo(correo: String): Usuario?
+
+    fun existsByUsuario(usuario: String): Boolean
+
+    fun existsByCorreo(correo: String): Boolean
+
+    @Query("""
+    SELECT DISTINCT u
+    FROM Usuario u
+    LEFT JOIN FETCH u.roles ur
+    LEFT JOIN FETCH ur.rol r
+    ORDER BY u.id
+""")
+    fun findAllConRoles(): List<Usuario>
 }

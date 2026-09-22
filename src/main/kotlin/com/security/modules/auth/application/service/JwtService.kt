@@ -24,23 +24,33 @@ class JwtService {
         val now = Date()
         val expirationDate = Date(now.time + expiration)
 
-        return Jwts.builder()
+        val rol = usuario.roles.firstOrNull()?.rol
+
+        val builder = Jwts.builder()
             .subject(usuario.usuario)
             .claim("userId", usuario.id)
-            // Si tu entidad tiene rol:
-            // .claim("rol", usuario.rol)
             .issuedAt(now)
             .expiration(expirationDate)
-            .signWith(key)
-            .compact()
+
+        if (rol != null) {
+            builder.claim("rol", rol.codigo)
+        }
+
+        return builder.signWith(key).compact()
     }
 
     fun extractUsername(token: String): String? {
-        return Jwts.parser()
+        return parseClaims(token).subject
+    }
+
+    fun extractRole(token: String): String? {
+        return parseClaims(token).get("rol", String::class.java)
+    }
+
+    private fun parseClaims(token: String) =
+        Jwts.parser()
             .verifyWith(key)
             .build()
             .parseSignedClaims(token)
             .payload
-            .subject
-    }
 }

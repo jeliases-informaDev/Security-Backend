@@ -1,4 +1,4 @@
-package com.security.shared.security
+package com.security.modules.auth.application.service
 
 import com.security.modules.auth.security.JwtService
 import jakarta.servlet.FilterChain

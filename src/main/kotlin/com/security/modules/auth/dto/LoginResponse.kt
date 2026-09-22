@@ -5,5 +5,4 @@ data class LoginResponse(
     val tokenType: String,
     val expiresIn: Long,
     val usuario: UsuarioLoginResponse
-
 )

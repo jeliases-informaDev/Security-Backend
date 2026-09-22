@@ -32,4 +32,15 @@ interface EntidadRepository : JpaRepository<Entidad, Int> {
         @Param("apellidoPaterno") apellidoPaterno: String?,
         @Param("apellidoMaterno") apellidoMaterno: String?
     ): List<Entidad>
+
+    @Query(
+        """
+        SELECT e FROM Entidad e
+        LEFT JOIN FETCH e.personaNatural
+        LEFT JOIN FETCH e.personaJuridica
+        LEFT JOIN FETCH e.tipoDocumento
+        WHERE e.id = :id
+        """
+    )
+    fun buscarPorIdConDetalle(@Param("id") id: Int): Entidad?
 }

@@ -12,6 +12,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
@@ -72,6 +73,22 @@ class GlobalExceptionHandler {
         return buildResponse(
             status = HttpStatus.FORBIDDEN,
             message = "No tiene permisos para acceder a este recurso",
+            request = request
+        )
+    }
+
+    // Respeta el status/mensaje de cualquier ResponseStatusException lanzada a mano en el
+    // codigo (p.ej. validaciones de negocio simples). Sin este handler, el catch-all
+    // Exception::class de abajo la interceptaria primero y siempre devolveria 500.
+    @ExceptionHandler(ResponseStatusException::class)
+    fun handleResponseStatusException(
+        ex: ResponseStatusException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.valueOf(ex.statusCode.value()),
+            message = ex.reason ?: "Solicitud inválida",
             request = request
         )
     }

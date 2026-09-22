@@ -9,3 +9,4 @@ class SecurityBackendApplication
 fun main(args: Array<String>) {
 	runApplication<SecurityBackendApplication>(*args)
 }
+

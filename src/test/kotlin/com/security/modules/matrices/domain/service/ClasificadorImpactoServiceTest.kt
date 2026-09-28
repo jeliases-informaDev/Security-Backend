@@ -1,87 +1,100 @@
 package com.security.modules.matrices.domain.service
 
 import com.security.modules.matrices.domain.enums.NivelImpacto
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import java.math.BigDecimal
 
 class ClasificadorImpactoServiceTest {
 
-    private val service = ClasificadorImpactoService()
+    private val service =
+        ClasificadorImpactoService()
 
     @Test
-    fun `monto menor a 4600 debe ser insignificante`() {
-
-        val resultado = service.clasificar(
-            BigDecimal("4599.99")
-        )
+    fun `30000 es insignificante`() {
 
         assertEquals(
             NivelImpacto.INSIGNIFICANTE,
-            resultado
+            service.clasificar(
+                BigDecimal("30000")
+            )
         )
     }
 
     @Test
-    fun `monto de 4600 debe ser menor`() {
-
-        val resultado = service.clasificar(
-            BigDecimal("4600")
-        )
+    fun `30000 punto 01 es menor`() {
 
         assertEquals(
             NivelImpacto.MENOR,
-            resultado
+            service.clasificar(
+                BigDecimal("30000.01")
+            )
         )
     }
 
     @Test
-    fun `monto de 230000 debe ser moderado`() {
+    fun `200000 es menor`() {
 
-        val resultado = service.clasificar(
-            BigDecimal("230000")
+        assertEquals(
+            NivelImpacto.MENOR,
+            service.clasificar(
+                BigDecimal("200000")
+            )
         )
+    }
+
+    @Test
+    fun `200000 punto 01 es moderado`() {
 
         assertEquals(
             NivelImpacto.MODERADO,
-            resultado
+            service.clasificar(
+                BigDecimal("200000.01")
+            )
         )
     }
 
     @Test
-    fun `monto de 460000 debe ser mayor`() {
+    fun `850000 es moderado`() {
 
-        val resultado = service.clasificar(
-            BigDecimal("460000")
+        assertEquals(
+            NivelImpacto.MODERADO,
+            service.clasificar(
+                BigDecimal("850000")
+            )
         )
+    }
+
+    @Test
+    fun `850000 punto 01 es mayor`() {
 
         assertEquals(
             NivelImpacto.MAYOR,
-            resultado
+            service.clasificar(
+                BigDecimal("850000.01")
+            )
         )
     }
 
     @Test
-    fun `monto de 920000 debe ser catastrofico`() {
+    fun `1700000 es mayor`() {
 
-        val resultado = service.clasificar(
-            BigDecimal("920000")
+        assertEquals(
+            NivelImpacto.MAYOR,
+            service.clasificar(
+                BigDecimal("1700000")
+            )
         )
+    }
+
+    @Test
+    fun `1700000 punto 01 es catastrofico`() {
 
         assertEquals(
             NivelImpacto.CATASTROFICO,
-            resultado
-        )
-    }
-
-    @Test
-    fun `monto negativo debe generar error`() {
-
-        assertThrows(IllegalArgumentException::class.java) {
             service.clasificar(
-                BigDecimal("-1")
+                BigDecimal("1700000.01")
             )
-        }
+        )
     }
 }

@@ -10,30 +10,43 @@ import java.math.BigDecimal
 
 class CalcularRiesgoInherenteUseCaseTest {
 
-    private val useCase = CalcularRiesgoInherenteUseCase()
+    private val useCase =
+        CalcularRiesgoInherenteUseCase()
 
     @Test
     fun `debe calcular riesgo inherente`() {
 
-        val request = CalcularRiesgoInherenteRequest(
-            probabilidad = NivelProbabilidad.ALTA,
-            impactoEstimado = BigDecimal("500000")
-        )
+        val request =
+            CalcularRiesgoInherenteRequest(
+                probabilidad = NivelProbabilidad.ALTA,
+                impactoEstimado = BigDecimal("500000")
+            )
 
-        val resultado = useCase.ejecutar(request)
+        val resultado =
+            useCase.ejecutar(request)
 
         assertEquals(
             NivelProbabilidad.ALTA,
             resultado.probabilidad
         )
 
+        /*
+         * Nuevo rango:
+         *
+         * > 200,000 y <= 850,000
+         * = MODERADO
+         */
         assertEquals(
-            NivelImpacto.MAYOR,
+            NivelImpacto.MODERADO,
             resultado.impacto
         )
 
+        /*
+         * ALTA x MODERADO
+         * = MODERADO
+         */
         assertEquals(
-            NivelRiesgo.ALTO,
+            NivelRiesgo.MODERADO,
             resultado.riesgoInherente
         )
     }

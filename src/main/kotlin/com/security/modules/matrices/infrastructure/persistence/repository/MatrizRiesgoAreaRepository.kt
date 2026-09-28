@@ -6,12 +6,17 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface MatrizRiesgoAreaRepository :
     JpaRepository<MatrizRiesgoAreaEntity, Int> {
 
-    fun findAllByUsuarioIdAndActivoTrue(
+    fun findAllByUsuario_IdAndActivoTrueOrderByNombreAsc(
         usuarioId: Int
     ): List<MatrizRiesgoAreaEntity>
 
-    fun existsByUsuarioIdAndNombreIgnoreCase(
+    fun existsByUsuario_IdAndNombreIgnoreCase(
         usuarioId: Int,
         nombre: String
     ): Boolean
+
+    fun findByIdAndUsuario_IdAndActivoTrue(
+        id: Int,
+        usuarioId: Int
+    ): MatrizRiesgoAreaEntity?
 }

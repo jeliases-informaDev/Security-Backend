@@ -1,5 +1,6 @@
 package com.security.modules.matrices.infrastructure.persistence.entity
 
+import com.security.modules.matrices.domain.enums.EstadoAnalisis
 import com.security.modules.matrices.domain.enums.FactorRiesgo
 import com.security.modules.matrices.domain.enums.NivelImpacto
 import com.security.modules.matrices.domain.enums.NivelProbabilidad
@@ -152,8 +153,9 @@ class MatrizRiesgoAnalisisEntity(
     @Column(name = "fecha_cierre")
     var fechaCierre: LocalDate? = null,
 
-    @Column(name = "estado", length = 20)
-    var estado: String = "EDITANDO",
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado", length = 20, nullable = false)
+    var estado: EstadoAnalisis = EstadoAnalisis.EDITANDO,
 
     @Column(name = "fecha_creacion")
     var fechaCreacion: LocalDateTime = LocalDateTime.now(),

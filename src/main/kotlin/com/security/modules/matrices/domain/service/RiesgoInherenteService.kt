@@ -3,6 +3,9 @@ package com.security.modules.matrices.domain.service
 import com.security.modules.matrices.domain.enums.NivelImpacto
 import com.security.modules.matrices.domain.enums.NivelProbabilidad
 import com.security.modules.matrices.domain.enums.NivelRiesgo
+import org.springframework.stereotype.Service
+
+@Service
 
 class RiesgoInherenteService {
 

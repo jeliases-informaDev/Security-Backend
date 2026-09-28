@@ -1,5 +1,6 @@
 package com.security.modules.matrices.infrastructure.persistence.repository
 
+import com.security.modules.matrices.domain.enums.EstadoAnalisis
 import com.security.modules.matrices.infrastructure.persistence.entity.MatrizRiesgoAnalisisEntity
 import org.springframework.data.jpa.repository.JpaRepository
 
@@ -12,7 +13,7 @@ interface MatrizRiesgoAnalisisRepository :
 
     fun findAllByUsuario_IdAndEstadoOrderByFechaCreacionDesc(
         usuarioId: Int,
-        estado: String
+        estado: EstadoAnalisis
     ): List<MatrizRiesgoAnalisisEntity>
 
     fun findByIdAndUsuario_Id(

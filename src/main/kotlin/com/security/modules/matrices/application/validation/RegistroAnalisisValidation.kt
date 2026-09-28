@@ -1,0 +1,4 @@
+package com.security.modules.matrices.application.validation
+
+
+interface RegistroAnalisisValidation

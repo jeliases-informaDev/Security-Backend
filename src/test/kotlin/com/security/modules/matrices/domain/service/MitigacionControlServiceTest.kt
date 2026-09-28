@@ -14,7 +14,7 @@ class MitigacionControlServiceTest {
     private val service = MitigacionControlService()
 
     @Test
-    fun `directivo preventivo automatico permanente debe devolver 0800`() {
+    fun `preventivo automatico permanente debe devolver 0600`() {
 
         val resultado = service.calcular(
             supervision = NivelSupervision.DIRECTIVO_AUTOMATICO,
@@ -26,13 +26,13 @@ class MitigacionControlServiceTest {
         )
 
         assertEquals(
-            BigDecimal("0.800"),
+            BigDecimal("0.600"),
             resultado
         )
     }
 
     @Test
-    fun `analista detectivo semiautomatico periodico debe devolver 0520`() {
+    fun `detectivo semiautomatico periodico debe devolver 0380`() {
 
         val resultado = service.calcular(
             supervision = NivelSupervision.ANALISTA_COORDINADOR,
@@ -44,13 +44,13 @@ class MitigacionControlServiceTest {
         )
 
         assertEquals(
-            BigDecimal("0.520"),
+            BigDecimal("0.380"),
             resultado
         )
     }
 
     @Test
-    fun `operativo detectivo manual eventual debe devolver 0280`() {
+    fun `detectivo manual eventual debe devolver 0220`() {
 
         val resultado = service.calcular(
             supervision = NivelSupervision.OPERATIVO,
@@ -62,13 +62,13 @@ class MitigacionControlServiceTest {
         )
 
         assertEquals(
-            BigDecimal("0.280"),
+            BigDecimal("0.220"),
             resultado
         )
     }
 
     @Test
-    fun `frecuencia no debe reducir resultado a la mitad`() {
+    fun `frecuencia no y seguimiento si deben aplicar cincuenta por ciento de ejecucion`() {
 
         val resultado = service.calcular(
             supervision = NivelSupervision.DIRECTIVO_AUTOMATICO,
@@ -80,13 +80,13 @@ class MitigacionControlServiceTest {
         )
 
         assertEquals(
-            BigDecimal("0.400"),
+            BigDecimal("0.300"),
             resultado
         )
     }
 
     @Test
-    fun `frecuencia y seguimiento no deben reducir resultado a la cuarta parte`() {
+    fun `frecuencia y seguimiento no deben producir mitigacion cero`() {
 
         val resultado = service.calcular(
             supervision = NivelSupervision.DIRECTIVO_AUTOMATICO,
@@ -98,7 +98,25 @@ class MitigacionControlServiceTest {
         )
 
         assertEquals(
-            BigDecimal("0.200"),
+            BigDecimal("0.000"),
+            resultado
+        )
+    }
+
+    @Test
+    fun `periodico automatico detectivo debe devolver 0440`() {
+
+        val resultado = service.calcular(
+            supervision = NivelSupervision.ANALISTA_COORDINADOR,
+            tipoControl = TipoControl.DETECTIVO,
+            operatividad = OperatividadControl.AUTOMATICO,
+            periodicidad = PeriodicidadControl.PERIODICO,
+            frecuenciaOportuna = RespuestaControl.SI,
+            seguimientoAdecuado = RespuestaControl.SI
+        )
+
+        assertEquals(
+            BigDecimal("0.440"),
             resultado
         )
     }

@@ -6,7 +6,9 @@ import com.security.modules.matrices.domain.service.ClasificadorImpactoService
 import com.security.modules.matrices.domain.service.MitigacionControlService
 import com.security.modules.matrices.domain.service.RiesgoInherenteService
 import com.security.modules.matrices.domain.service.RiesgoResidualService
+import org.springframework.stereotype.Service
 
+@Service
 class CalcularMatrizRiesgoUseCase(
     private val clasificadorImpactoService: ClasificadorImpactoService =
         ClasificadorImpactoService(),

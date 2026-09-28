@@ -44,6 +44,8 @@ dependencies {
 
     implementation("org.springframework.security:spring-security-crypto")
 
+    implementation("org.apache.pdfbox:pdfbox:3.0.8")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.mockk:mockk:1.13.8")
 }

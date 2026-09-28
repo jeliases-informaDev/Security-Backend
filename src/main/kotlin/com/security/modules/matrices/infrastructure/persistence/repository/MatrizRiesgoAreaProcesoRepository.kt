@@ -10,8 +10,9 @@ interface MatrizRiesgoAreaProcesoRepository :
         areaId: Int
     ): List<MatrizRiesgoAreaProcesoEntity>
 
-    fun findAllByProceso_Id(
-        procesoId: Int
+    fun findAllByArea_IdAndUsuario_Id(
+        areaId: Int,
+        usuarioId: Int
     ): List<MatrizRiesgoAreaProcesoEntity>
 
     fun existsByArea_IdAndProceso_Id(

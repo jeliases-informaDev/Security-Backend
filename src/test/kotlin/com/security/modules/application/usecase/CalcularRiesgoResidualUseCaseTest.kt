@@ -16,41 +16,82 @@ import java.math.BigDecimal
 
 class CalcularRiesgoResidualUseCaseTest {
 
-    private val useCase = CalcularRiesgoResidualUseCase()
+    private val useCase =
+        CalcularRiesgoResidualUseCase()
 
     @Test
     fun `debe calcular riesgo residual`() {
 
-        val request = CalcularRiesgoResidualRequest(
-            tipoEmpresa = TipoEmpresa.GRAN_EMPRESA,
-            probabilidadInherente = NivelProbabilidad.ALTA,
-            impactoEstimado = BigDecimal("500000"),
+        val request =
+            CalcularRiesgoResidualRequest(
+                tipoEmpresa = TipoEmpresa.GRAN_EMPRESA,
+                probabilidadInherente =
+                    NivelProbabilidad.ALTA,
 
-            supervision = NivelSupervision.DIRECTIVO_AUTOMATICO,
-            tipoControl = TipoControl.PREVENTIVO,
-            operatividad = OperatividadControl.AUTOMATICO,
-            periodicidad = PeriodicidadControl.PERMANENTE,
-            frecuenciaOportuna = RespuestaControl.SI,
-            seguimientoAdecuado = RespuestaControl.SI
-        )
+                impactoEstimado =
+                    BigDecimal("500000"),
 
-        val resultado = useCase.ejecutar(request)
+                supervision =
+                    NivelSupervision.DIRECTIVO_AUTOMATICO,
 
+                tipoControl =
+                    TipoControl.PREVENTIVO,
+
+                operatividad =
+                    OperatividadControl.AUTOMATICO,
+
+                periodicidad =
+                    PeriodicidadControl.PERMANENTE,
+
+                frecuenciaOportuna =
+                    RespuestaControl.SI,
+
+                seguimientoAdecuado =
+                    RespuestaControl.SI
+            )
+
+        val resultado =
+            useCase.ejecutar(request)
+
+        /*
+         * Diseño:
+         * 0.20 + 0.20 + 0.20 = 0.60
+         *
+         * Ejecución:
+         * 0.50 + 0.50 = 1.00
+         *
+         * Mitigación:
+         * 0.60
+         */
         assertEquals(
-            BigDecimal("0.800"),
+            BigDecimal("0.600"),
             resultado.mitigacion
         )
 
+        /*
+         * 0.699 * 0.40
+         * = 0.2796
+         * = MEDIA
+         */
         assertEquals(
             NivelProbabilidad.MEDIA,
             resultado.probabilidadResidual
         )
 
+        /*
+         * 500,000 * 0.40
+         * = 200,000
+         * = MENOR
+         */
         assertEquals(
             NivelImpacto.MENOR,
             resultado.impactoResidual
         )
 
+        /*
+         * MEDIA x MENOR
+         * = LEVE
+         */
         assertEquals(
             NivelRiesgo.LEVE,
             resultado.riesgoResidual

@@ -16,49 +16,52 @@ import java.math.BigDecimal
 
 class CalcularMatrizRiesgoUseCaseTest {
 
-    private val useCase = CalcularMatrizRiesgoUseCase()
+    private val useCase =
+        CalcularMatrizRiesgoUseCase()
 
     @Test
     fun `debe calcular matriz completa`() {
 
-        val request = CalcularMatrizRiesgoRequest(
-            tipoEmpresa = TipoEmpresa.GRAN_EMPRESA,
-            probabilidad = NivelProbabilidad.ALTA,
-            impactoEstimado = BigDecimal("500000"),
+        val request =
+            CalcularMatrizRiesgoRequest(
+                tipoEmpresa = TipoEmpresa.GRAN_EMPRESA,
+                probabilidad = NivelProbabilidad.ALTA,
+                impactoEstimado = BigDecimal("500000"),
 
-            supervision =
-                NivelSupervision.DIRECTIVO_AUTOMATICO,
+                supervision =
+                    NivelSupervision.DIRECTIVO_AUTOMATICO,
 
-            tipoControl =
-                TipoControl.PREVENTIVO,
+                tipoControl =
+                    TipoControl.PREVENTIVO,
 
-            operatividad =
-                OperatividadControl.AUTOMATICO,
+                operatividad =
+                    OperatividadControl.AUTOMATICO,
 
-            periodicidad =
-                PeriodicidadControl.PERMANENTE,
+                periodicidad =
+                    PeriodicidadControl.PERMANENTE,
 
-            frecuenciaOportuna =
-                RespuestaControl.SI,
+                frecuenciaOportuna =
+                    RespuestaControl.SI,
 
-            seguimientoAdecuado =
-                RespuestaControl.SI
-        )
+                seguimientoAdecuado =
+                    RespuestaControl.SI
+            )
 
-        val resultado = useCase.ejecutar(request)
+        val resultado =
+            useCase.ejecutar(request)
 
         assertEquals(
-            NivelImpacto.MAYOR,
+            NivelImpacto.MODERADO,
             resultado.impactoInherente
         )
 
         assertEquals(
-            NivelRiesgo.ALTO,
+            NivelRiesgo.MODERADO,
             resultado.riesgoInherente
         )
 
         assertEquals(
-            BigDecimal("0.800"),
+            BigDecimal("0.600"),
             resultado.mitigacion
         )
 

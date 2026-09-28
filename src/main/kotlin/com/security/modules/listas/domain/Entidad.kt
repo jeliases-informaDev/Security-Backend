@@ -49,6 +49,9 @@ class Entidad(
     @Column(name = "rubro")
     var rubro: String? = null,
 
+    @Column(name = "alias")
+    var alias: String? = null,
+
     @OneToOne(mappedBy = "entidad", cascade = [CascadeType.ALL], orphanRemoval = true)
     var personaNatural: PersonaNatural? = null,
 

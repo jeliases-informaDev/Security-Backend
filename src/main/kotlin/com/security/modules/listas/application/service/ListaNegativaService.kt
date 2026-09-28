@@ -27,6 +27,7 @@ class ListaNegativaService(
     fun buscar(
         username: String,
         documento: String?,
+        tipoDocumento: String?,
         nombres: String?,
         apellidoPaterno: String?,
         apellidoMaterno: String?
@@ -42,6 +43,7 @@ class ListaNegativaService(
 
         val entidades = entidadRepository.buscar(
             documento = documento?.trim()?.ifBlank { null },
+            tipoDocumento = tipoDocumento?.trim()?.ifBlank { null },
             nombres = nombres?.trim()?.ifBlank { null },
             apellidoPaterno = apellidoPaterno?.trim()?.ifBlank { null },
             apellidoMaterno = apellidoMaterno?.trim()?.ifBlank { null }
@@ -103,6 +105,9 @@ class ListaNegativaService(
                     id = mancha.id!!,
                     tipoListaCodigo = mancha.tipoLista.codigo,
                     tipoListaNombre = mancha.tipoLista.nombre,
+                    grupoNombre = mancha.tipoLista.grupo?.nombre,
+                    grupoColor = mancha.tipoLista.grupo?.color,
+                    esPep = mancha.tipoLista.esPep,
                     descripcion = mancha.descripcion,
                     link = mancha.link,
                     fechaRegistro = mancha.fechaRegistro,
@@ -121,6 +126,15 @@ class ListaNegativaService(
             documento = this.documento,
             tipoDocumento = this.tipoDocumento.nombre,
             nombreCompleto = nombreCompleto,
+            nombres = listOfNotNull(
+                this.personaNatural?.nombre,
+                this.personaNatural?.segundoNombre
+            ).joinToString(" ").ifBlank { null },
+            apellidoPaterno = this.personaNatural?.apePat,
+            apellidoMaterno = this.personaNatural?.apeMat,
+            pasaporte = this.personaNatural?.pasaporte,
+            alias = this.alias,
+            fechaNacimientoRegistro = this.fechaRegistro,
             pais = this.pais?.nombre,
             manchas = manchas
         )

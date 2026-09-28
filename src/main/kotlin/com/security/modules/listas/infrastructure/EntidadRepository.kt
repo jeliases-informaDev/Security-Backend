@@ -16,6 +16,7 @@ interface EntidadRepository : JpaRepository<Entidad, Int> {
         LEFT JOIN FETCH e.personaJuridica pj
         LEFT JOIN FETCH e.tipoDocumento
         WHERE (:documento IS NULL OR e.documento = :documento)
+        AND (:tipoDocumento IS NULL OR e.tipoDocumento.nombre = :tipoDocumento)
         AND (:apellidoPaterno IS NULL OR UPPER(pn.apePat) LIKE UPPER(CONCAT('%', :apellidoPaterno, '%')))
         AND (:apellidoMaterno IS NULL OR UPPER(pn.apeMat) LIKE UPPER(CONCAT('%', :apellidoMaterno, '%')))
         AND (
@@ -28,6 +29,7 @@ interface EntidadRepository : JpaRepository<Entidad, Int> {
     )
     fun buscar(
         @Param("documento") documento: String?,
+        @Param("tipoDocumento") tipoDocumento: String?,
         @Param("nombres") nombres: String?,
         @Param("apellidoPaterno") apellidoPaterno: String?,
         @Param("apellidoMaterno") apellidoMaterno: String?

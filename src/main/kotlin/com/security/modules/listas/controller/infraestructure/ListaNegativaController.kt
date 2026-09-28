@@ -23,6 +23,7 @@ class ListaNegativaController(
     fun buscar(
         authentication: Authentication,
         @RequestParam(required = false) documento: String?,
+        @RequestParam(required = false) tipoDocumento: String?,
         @RequestParam(required = false) nombres: String?,
         @RequestParam(required = false) apellidoPaterno: String?,
         @RequestParam(required = false) apellidoMaterno: String?
@@ -31,6 +32,7 @@ class ListaNegativaController(
         val resultados = listaNegativaService.buscar(
             username = authentication.name,
             documento = documento,
+            tipoDocumento = tipoDocumento,
             nombres = nombres,
             apellidoPaterno = apellidoPaterno,
             apellidoMaterno = apellidoMaterno

@@ -71,6 +71,26 @@ class MatrizRiesgoPdfService(
         Color.WHITE
 
     // =========================================================
+    // COLORES FUNCIONALES DEL HEATMAP
+    // MATRIZ EXCEL
+    // =========================================================
+
+    private val riesgoMinimo =
+        Color(0, 176, 240) // #00B0F0
+
+    private val riesgoLeve =
+        Color(146, 208, 80) // #92D050
+
+    private val riesgoModerado =
+        Color(255, 255, 0) // #FFFF00
+
+    private val riesgoAlto =
+        Color(226, 107, 10) // #E26B0A
+
+    private val riesgoMuyAlto =
+        Color(255, 0, 0) // #FF0000
+
+    // =========================================================
     // FORMATOS
     // =========================================================
 
@@ -89,24 +109,10 @@ class MatrizRiesgoPdfService(
 
         private const val LABEL_WIDTH = 145f
 
-        /*
-         * Ahora las filas tienen un poco más de altura.
-         * Antes eran 20f.
-         */
         private const val ALTO_FILA_MINIMO = 22f
 
-        /*
-         * Espacio entre bloques completos:
-         *
-         * RIESGO IDENTIFICADO
-         *      ↓
-         * RIESGO INHERENTE
-         */
         private const val ESPACIO_ENTRE_BLOQUES = 12f
 
-        /*
-         * Separación especial antes de cada heatmap.
-         */
         private const val ESPACIO_ANTES_HEATMAP = 14f
 
         private const val LOGO_PATH =
@@ -124,13 +130,6 @@ class MatrizRiesgoPdfService(
 
         PDDocument().use { document ->
 
-            /*
-             * El PNG tiene bastante espacio transparente alrededor.
-             *
-             * Ahora lo recortamos automáticamente antes de insertarlo
-             * en el PDF para que el logo visible pueda aprovechar
-             * realmente el tamaño disponible.
-             */
             val logo =
                 cargarLogoInstitucional(document)
 
@@ -139,7 +138,6 @@ class MatrizRiesgoPdfService(
 
             // =====================================================
             // PÁGINA 1
-            // CABECERA INSTITUCIONAL SOLO AQUÍ
             // =====================================================
 
             val pagina1 =
@@ -188,9 +186,6 @@ class MatrizRiesgoPdfService(
                     alterna = true
                 )
 
-                /*
-                 * Más aire entre bloques.
-                 */
                 y -= ESPACIO_ENTRE_BLOQUES
 
                 // -------------------------------------------------
@@ -322,10 +317,6 @@ class MatrizRiesgoPdfService(
                         analisis.impactoInherente
                 )
 
-                /*
-                 * Separación entre la tarjeta del heatmap
-                 * y la siguiente sección.
-                 */
                 y -= ESPACIO_ENTRE_BLOQUES
 
                 // -------------------------------------------------
@@ -373,9 +364,6 @@ class MatrizRiesgoPdfService(
 
             // =====================================================
             // PÁGINA 2
-            //
-            // IMPORTANTE:
-            // YA NO REPETIMOS LOGO, TÍTULO, USUARIO NI FECHA.
             // =====================================================
 
             val pagina2 =
@@ -388,11 +376,6 @@ class MatrizRiesgoPdfService(
                 pagina2
             ).use { contenido ->
 
-                /*
-                 * Empezamos directamente desde el margen superior.
-                 *
-                 * No llamamos a dibujarCabecera().
-                 */
                 var y =
                     pagina2.mediaBox.height -
                             MARGIN
@@ -623,9 +606,6 @@ class MatrizRiesgoPdfService(
                     }
                 }
 
-        /*
-         * Elimina márgenes transparentes del PNG.
-         */
         val imagenRecortada =
             recortarTransparencia(
                 imagenOriginal
@@ -653,16 +633,9 @@ class MatrizRiesgoPdfService(
         var maxY =
             -1
 
-        /*
-         * Buscamos todos los píxeles realmente visibles.
-         */
-        for (
-        y in 0 until imagen.height
-        ) {
+        for (y in 0 until imagen.height) {
 
-            for (
-            x in 0 until imagen.width
-            ) {
+            for (x in 0 until imagen.width) {
 
                 val alpha =
                     imagen.getRGB(
@@ -671,13 +644,7 @@ class MatrizRiesgoPdfService(
                     )
                         .ushr(24) and 0xFF
 
-                /*
-                 * Ignoramos transparencia y pequeños residuos
-                 * de antialiasing casi invisibles.
-                 */
-                if (
-                    alpha > 10
-                ) {
+                if (alpha > 10) {
 
                     if (x < minX) {
                         minX = x
@@ -698,10 +665,6 @@ class MatrizRiesgoPdfService(
             }
         }
 
-        /*
-         * Si por alguna razón no encontramos transparencia
-         * utilizable, devolvemos la imagen original.
-         */
         if (
             maxX < minX ||
             maxY < minY
@@ -710,9 +673,6 @@ class MatrizRiesgoPdfService(
             return imagen
         }
 
-        /*
-         * Pequeño margen de seguridad.
-         */
         val margen =
             8
 
@@ -750,7 +710,6 @@ class MatrizRiesgoPdfService(
 
     // =========================================================
     // CABECERA INSTITUCIONAL
-    // SOLO SE UTILIZA EN LA PRIMERA PÁGINA
     // =========================================================
 
     private fun dibujarCabecera(
@@ -767,13 +726,6 @@ class MatrizRiesgoPdfService(
         val anchoPagina =
             pagina.mediaBox.width
 
-        /*
-         * Logo ahora más grande.
-         *
-         * Como ya recortamos el espacio transparente,
-         * prácticamente todo este ancho corresponde
-         * al logo realmente visible.
-         */
         dibujarLogo(
             contenido = contenido,
             logo = logo,
@@ -826,10 +778,6 @@ class MatrizRiesgoPdfService(
             color = azul75
         )
 
-        /*
-         * Línea institucional:
-         * rojo como acento + azul principal.
-         */
         contenido.setLineWidth(
             2.2f
         )
@@ -870,9 +818,6 @@ class MatrizRiesgoPdfService(
 
         contenido.stroke()
 
-        /*
-         * Espacio debajo de la cabecera.
-         */
         return altoPagina - 140f
     }
 
@@ -938,9 +883,6 @@ class MatrizRiesgoPdfService(
 
         contenido.fill()
 
-        /*
-         * Acento rojo institucional.
-         */
         contenido.setNonStrokingColor(
             rojoInstitucional
         )
@@ -964,12 +906,6 @@ class MatrizRiesgoPdfService(
             color = blanco
         )
 
-        /*
-         * Antes retornábamos y - 23f.
-         *
-         * Ahora dejamos más espacio antes
-         * de comenzar la tabla.
-         */
         return y - 28f
     }
 
@@ -997,8 +933,7 @@ class MatrizRiesgoPdfService(
         val lineas =
             dividirTexto(
                 texto = valor,
-                anchoMaximo =
-                    anchoValor,
+                anchoMaximo = anchoValor,
                 tamano = 8.5f,
                 fuente = fontRegular
             )
@@ -1009,12 +944,6 @@ class MatrizRiesgoPdfService(
                 lineas.size
             )
 
-        /*
-         * Antes la altura mínima era 20.
-         *
-         * Ahora usamos 22 para que las filas
-         * respiren un poco más.
-         */
         val alto =
             max(
                 ALTO_FILA_MINIMO,
@@ -1023,9 +952,7 @@ class MatrizRiesgoPdfService(
                         10.5f
             )
 
-        if (
-            alterna
-        ) {
+        if (alterna) {
 
             contenido.setNonStrokingColor(
                 azul10
@@ -1041,9 +968,6 @@ class MatrizRiesgoPdfService(
             contenido.fill()
         }
 
-        /*
-         * Separador de fila.
-         */
         contenido.setStrokingColor(
             azul25
         )
@@ -1064,9 +988,6 @@ class MatrizRiesgoPdfService(
 
         contenido.stroke()
 
-        /*
-         * Etiqueta.
-         */
         escribirTexto(
             contenido = contenido,
             texto = etiqueta,
@@ -1077,9 +998,6 @@ class MatrizRiesgoPdfService(
             color = negroTexto
         )
 
-        /*
-         * Valor.
-         */
         lineas.forEachIndexed {
                 indice,
                 linea ->
@@ -1108,7 +1026,7 @@ class MatrizRiesgoPdfService(
     }
 
     // =========================================================
-    // HEATMAP INSTITUCIONAL
+    // HEATMAP
     // =========================================================
 
     private fun dibujarHeatmap(
@@ -1192,9 +1110,9 @@ class MatrizRiesgoPdfService(
             ySuperior -
                     altoCard
 
-        // =====================================================
-        // TARJETA GENERAL
-        // =====================================================
+        // -----------------------------------------------------
+        // TARJETA
+        // -----------------------------------------------------
 
         contenido.setNonStrokingColor(
             blanco
@@ -1226,9 +1144,9 @@ class MatrizRiesgoPdfService(
 
         contenido.stroke()
 
-        // =====================================================
+        // -----------------------------------------------------
         // CABECERA DEL HEATMAP
-        // =====================================================
+        // -----------------------------------------------------
 
         contenido.setNonStrokingColor(
             azul10
@@ -1266,9 +1184,9 @@ class MatrizRiesgoPdfService(
             color = azulInstitucional
         )
 
-        // =====================================================
+        // -----------------------------------------------------
         // POSICIONES
-        // =====================================================
+        // -----------------------------------------------------
 
         val gridTop =
             ySuperior -
@@ -1293,9 +1211,9 @@ class MatrizRiesgoPdfService(
             gridTop -
                     altoGrid
 
-        // =====================================================
-        // PROBABILIDAD - BANDA VERTICAL
-        // =====================================================
+        // -----------------------------------------------------
+        // BANDA PROBABILIDAD
+        // -----------------------------------------------------
 
         contenido.setNonStrokingColor(
             azul10
@@ -1342,9 +1260,9 @@ class MatrizRiesgoPdfService(
                 azulInstitucional
         )
 
-        // =====================================================
+        // -----------------------------------------------------
         // CELDAS
-        // =====================================================
+        // -----------------------------------------------------
 
         probabilidades.forEachIndexed {
                 indiceFila,
@@ -1394,10 +1312,6 @@ class MatrizRiesgoPdfService(
                         impacto
                     )
 
-                /*
-                 * Colores funcionales originales:
-                 * NO se modifican.
-                 */
                 contenido.setNonStrokingColor(
                     colorRiesgo(
                         riesgo
@@ -1415,7 +1329,7 @@ class MatrizRiesgoPdfService(
                 contenido.fill()
 
                 /*
-                 * Separador blanco.
+                 * Separador blanco entre las celdas.
                  */
                 contenido.setStrokingColor(
                     blanco
@@ -1435,9 +1349,6 @@ class MatrizRiesgoPdfService(
 
                 contenido.stroke()
 
-                /*
-                 * Marcador.
-                 */
                 if (
                     probabilidad ==
                     marcadorProbabilidad &&
@@ -1461,9 +1372,9 @@ class MatrizRiesgoPdfService(
             }
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // ETIQUETAS DE IMPACTO
-        // =====================================================
+        // -----------------------------------------------------
 
         impactos.forEachIndexed {
                 indice,
@@ -1492,9 +1403,9 @@ class MatrizRiesgoPdfService(
             )
         }
 
-        // =====================================================
-        // IMPACTO - BANDA HORIZONTAL
-        // =====================================================
+        // -----------------------------------------------------
+        // BANDA IMPACTO
+        // -----------------------------------------------------
 
         val impactoBandY =
             gridBottom -
@@ -1547,10 +1458,6 @@ class MatrizRiesgoPdfService(
                 azulInstitucional
         )
 
-        /*
-         * Dejamos un poco de aire al terminar
-         * la tarjeta.
-         */
         return cardBottom -
                 9f
     }
@@ -1565,9 +1472,6 @@ class MatrizRiesgoPdfService(
         centroY: Float
     ) {
 
-        /*
-         * Aro blanco.
-         */
         dibujarCirculo(
             contenido =
                 contenido,
@@ -1579,9 +1483,6 @@ class MatrizRiesgoPdfService(
             color = blanco
         )
 
-        /*
-         * Centro azul institucional.
-         */
         dibujarCirculo(
             contenido =
                 contenido,
@@ -1881,9 +1782,7 @@ class MatrizRiesgoPdfService(
                 palabra ->
 
             val candidato =
-                if (
-                    linea.isEmpty()
-                ) {
+                if (linea.isEmpty()) {
                     palabra
                 } else {
                     "$linea $palabra"
@@ -1949,51 +1848,29 @@ class MatrizRiesgoPdfService(
 
     // =========================================================
     // COLORES FUNCIONALES DEL HEATMAP
-    // NO MODIFICAR
+    // MATRIZ EXCEL
     // =========================================================
 
     private fun colorRiesgo(
         riesgo: NivelRiesgo
     ): Color {
 
-        return when (
-            riesgo
-        ) {
+        return when (riesgo) {
 
             NivelRiesgo.MINIMO ->
-                Color(
-                    91,
-                    169,
-                    224
-                )
+                riesgoMinimo
 
             NivelRiesgo.LEVE ->
-                Color(
-                    67,
-                    160,
-                    71
-                )
+                riesgoLeve
 
             NivelRiesgo.MODERADO ->
-                Color(
-                    255,
-                    235,
-                    59
-                )
+                riesgoModerado
 
             NivelRiesgo.ALTO ->
-                Color(
-                    255,
-                    152,
-                    0
-                )
+                riesgoAlto
 
             NivelRiesgo.MUY_ALTO ->
-                Color(
-                    244,
-                    67,
-                    54
-                )
+                riesgoMuyAlto
         }
     }
 
@@ -2005,9 +1882,7 @@ class MatrizRiesgoPdfService(
         riesgo: NivelRiesgo?
     ): String {
 
-        return when (
-            riesgo
-        ) {
+        return when (riesgo) {
 
             NivelRiesgo.MINIMO ->
                 "Muy Bajo"
@@ -2088,9 +1963,7 @@ class MatrizRiesgoPdfService(
         valor: Boolean?
     ): String {
 
-        return when (
-            valor
-        ) {
+        return when (valor) {
 
             true ->
                 "Sí"

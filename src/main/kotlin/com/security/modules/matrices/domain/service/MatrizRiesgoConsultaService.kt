@@ -71,14 +71,35 @@ class MatrizRiesgoConsultaService(
 
         return MatrizRiesgoResumenResponse(
             id = analisis.id!!,
+
             titulo = analisis.titulo,
+
             area = analisis.area?.nombre,
+
             proceso = analisis.proceso?.nombre,
+
+            probabilidad = analisis.probabilidadNivel,
+
+            impactoInherente = analisis.impactoNivel,
+
             riesgoInherente = analisis.riesgoInherente,
-            riesgoResidual = analisis.riesgoResidual,
+
+            probabilidadResidual =
+                analisis.probabilidadResidual,
+
+            impactoResidual =
+                analisis.impactoResidual,
+
+            riesgoResidual =
+                analisis.riesgoResidual,
+
             estado = analisis.estado,
-            fechaCreacion = analisis.fechaCreacion,
-            fechaCierre = analisis.fechaCierre
+
+            fechaCreacion =
+                analisis.fechaCreacion,
+
+            fechaCierre =
+                analisis.fechaCierre
         )
     }
 

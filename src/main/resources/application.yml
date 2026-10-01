@@ -4,6 +4,9 @@ server:
     include-message: always
 
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: security-backend
 

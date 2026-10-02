@@ -43,4 +43,5 @@ out/
 .kotlin
 
 ### Local env ###
-.env
+.env.example
+

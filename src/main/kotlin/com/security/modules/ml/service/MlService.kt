@@ -7,8 +7,8 @@ import com.security.modules.ml.dto.IndiraChatResponse
 import com.security.modules.ml.dto.MlChatRequest
 import com.security.modules.ml.dto.PersonaConCasosResponse
 import com.security.modules.ml.dto.PersonaMlResponse
+import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.exceptions.ResourceNotFoundException
-import com.security.shared.repositories.UsuarioRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException

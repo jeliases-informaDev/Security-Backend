@@ -32,6 +32,9 @@ class MlClient(private val properties: MlProperties) {
 
     private fun construir(timeoutSeconds: Long): RestClient {
         val httpClient = HttpClient.newBuilder()
+            // Por defecto el cliente de Java intenta subir a HTTP/2 (Upgrade: h2c) y Uvicorn, el servidor
+            // del ML, pierde el cuerpo de los POST cuando ve ese encabezado (responde 422 "body missing").
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(5))
             .build()
         val factory = JdkClientHttpRequestFactory(httpClient).apply {

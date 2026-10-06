@@ -121,3 +121,5 @@ SELECT (SELECT COUNT(*) FROM scoring_ocupacion) AS ocupaciones,
 | **Nada que hacer** | Si usas el `docker compose` de este repo: el arranque ya carga los catálogos (`APP_SEED_ENABLED=true`). |
 | **Ejecutar [catalogos-scoring.sql](catalogos-scoring.sql) a mano** | En cualquier otra base (Aiven, una restaurada…). Ábrelo en phpMyAdmin / Workbench / DBeaver conectado a `security_db`, ejecútalo completo y recarga la web. Es repetible: no duplica ni cambia puntajes. **Sobre Aiven lo ve todo el equipo.** |
 | **Apuntar el backend a otra base que ya tenga catálogos** | Cambia `DB_URL` en `.env` y reinicia el backend. |
+
+**Datos de listas (catálogo, sancionadas SBS y figuras políticas):** se cargan con `tools/cargar_datos.py` (ver `tools/README.md`); por defecto solo simula.

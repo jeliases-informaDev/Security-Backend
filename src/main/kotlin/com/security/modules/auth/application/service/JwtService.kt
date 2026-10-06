@@ -3,15 +3,16 @@ package com.security.modules.auth.security
 import com.security.shared.datos.entities.Usuario
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.nio.charset.StandardCharsets
 import java.util.Date
 
 @Service
-class JwtService {
-
-    private val secret = System.getenv("JWT_SECRET")
-        ?: "CLAVE-TEMPORAL-SOLO-PARA-DESARROLLO-123456789"
+class JwtService(
+    // Se define con JWT_SECRET (variable de entorno o .env); ver application.yml.
+    @Value("\${jwt.secret}") secret: String
+) {
 
     private val expiration = 15 * 60 * 1000L // 15 minutos
 

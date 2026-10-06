@@ -32,6 +32,22 @@ ml:
   timeout-seconds: 15
   chat-timeout-seconds: 120
 
+# Firma de los tokens JWT (minimo 32 caracteres). En un entorno real define JWT_SECRET.
+jwt:
+  secret: ${JWT_SECRET:CLAVE-TEMPORAL-SOLO-PARA-DESARROLLO-123456789}
+
+# Origenes del frontend permitidos por CORS, separados por coma.
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+# Datos iniciales de desarrollo (rol admin, usuario y catalogos). Solo para bases locales nuevas.
+app:
+  seed:
+    enabled: ${APP_SEED_ENABLED:false}
+    admin-user: ${APP_SEED_ADMIN_USER:superadmin}
+    admin-password: ${APP_SEED_ADMIN_PASSWORD:Admin12345!}
+    admin-email: ${APP_SEED_ADMIN_EMAIL:admin@security.local}
+
 management:
   endpoints:
     web:

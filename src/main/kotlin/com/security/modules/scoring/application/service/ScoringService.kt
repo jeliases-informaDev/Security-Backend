@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.text.Normalizer
 
 @Service
 class ScoringService(
@@ -133,20 +134,27 @@ class ScoringService(
     }
 
     // Cliente Sensible se deriva automaticamente, no se pide al usuario:
-    // si la entidad ya tiene un registro PEP en Listas Negativas, se marca PEP;
+    // si la entidad ya tiene un registro en una lista PEP de Listas Negativas, se marca PEP;
     // si no, se distingue Nacional/Extranjero segun el pais registrado.
+    // Puntajes del libro vigente (hoja FactorClientePN, variable Cliente_Sensible).
+    // "No Residente" (3) no se puede derivar todavia: el sistema no registra la residencia.
     private fun evaluarClienteSensible(entidad: Entidad): Pair<String, Int> {
         val esPep = entidad.manchas.any { it.tipoLista.esPep }
-        if (esPep) return "PEP" to 5
+        if (esPep) return "PEP" to PUNTAJE_CLIENTE_PEP
 
-        val esNacional = entidad.pais?.nombre?.equals("Peru", ignoreCase = true) ?: true
-        return if (esNacional) "Nacional" to 1 else "Extranjero" to 3
+        val esNacional = entidad.pais?.nombre?.let { sinTildes(it).equals("Peru", ignoreCase = true) } ?: true
+        return if (esNacional) "Nacional" to PUNTAJE_CLIENTE_NACIONAL else "Extranjero" to PUNTAJE_CLIENTE_EXTRANJERO
     }
 
+    private fun sinTildes(texto: String): String =
+        Normalizer.normalize(texto, Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+
+    // Rangos del libro vigente para persona natural (hoja FactorClienteRangos, Volumen_Transaccional_Esperado):
+    // hasta 8 000 -> 1; de 8 000 a 20 000 -> 2; mas de 20 000 -> 3.
     private fun evaluarVolumenTransaccional(monto: BigDecimal): Int = when {
-        monto <= BigDecimal(8000) -> 1
-        monto <= BigDecimal(20000) -> 3
-        else -> 5
+        monto <= TOPE_VOLUMEN_BAJO -> 1
+        monto <= TOPE_VOLUMEN_MEDIO -> 2
+        else -> 3
     }
 
     private fun categorizar(puntaje: BigDecimal): String = when {
@@ -163,9 +171,21 @@ class ScoringService(
     }
 
     companion object {
-        private const val PESO_OCUPACION = 30
-        private const val PESO_CLIENTE_SENSIBLE = 25
-        private const val PESO_DEPARTAMENTO = 25
-        private const val PESO_VOLUMEN = 20
+        // Pesos del libro vigente (Scoring y Factores_Riesgo LAFT / Puntaje paises, nov-2020):
+        // Ocupacion 5, Cliente Sensible 10, Residencia 3 y Volumen 7 (suman 25 de 100).
+        // Esta evaluacion solo cubre esas 4 variables, asi que se reescalan para sumar 100:
+        // 5/25 = 20 %, 10/25 = 40 %, 3/25 = 12 % y 7/25 = 28 %.
+        // El modelo completo (15 variables en persona natural) esta pendiente.
+        private const val PESO_OCUPACION = 20
+        private const val PESO_CLIENTE_SENSIBLE = 40
+        private const val PESO_DEPARTAMENTO = 12
+        private const val PESO_VOLUMEN = 28
+
+        private const val PUNTAJE_CLIENTE_NACIONAL = 1
+        private const val PUNTAJE_CLIENTE_EXTRANJERO = 2
+        private const val PUNTAJE_CLIENTE_PEP = 4
+
+        private val TOPE_VOLUMEN_BAJO = BigDecimal(8000)
+        private val TOPE_VOLUMEN_MEDIO = BigDecimal(20000)
     }
 }

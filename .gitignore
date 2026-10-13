@@ -45,3 +45,9 @@ out/
 ### Local env ###
 .env
 
+/storage/
+
+### Credenciales / claves privadas ###
+*.pem
+*.key
+.oci/

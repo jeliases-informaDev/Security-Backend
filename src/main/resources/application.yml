@@ -53,3 +53,22 @@ management:
     web:
       exposure:
         include: health, info, metrics
+
+
+# ============================================================
+# ALMACENAMIENTO DE DOCUMENTOS
+# ============================================================
+
+storage:
+  provider: ${STORAGE_PROVIDER:local}
+
+  local:
+    base-path: ${STORAGE_LOCAL_BASE_PATH:./storage}
+
+  oracle:
+    region: ${OCI_REGION:}
+    namespace: ${OCI_NAMESPACE:}
+    bucket: ${OCI_BUCKET:}
+    auth-mode: ${OCI_AUTH_MODE:CONFIG_FILE}
+    config-file: ${OCI_CONFIG_FILE:}
+    profile: ${OCI_PROFILE:DEFAULT}

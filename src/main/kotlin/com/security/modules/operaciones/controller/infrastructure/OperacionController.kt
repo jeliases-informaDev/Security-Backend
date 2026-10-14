@@ -8,6 +8,7 @@ import com.tuempresa.operaciones.dto.RegistrarOperacionRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -25,9 +26,13 @@ class OperacionController(
     @GetMapping("/resumen")
     fun listarResumen(
         @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "10") size: Int
+        @RequestParam(defaultValue = "10") size: Int,
+        authentication: Authentication // Inyecta la autenticación actual de Spring Security
     ): ListarOperacionesResponse {
-        return operacionService.obtenerResumenPaginado(page, size)
+        // authentication.name contiene el username (ej. "lavado_pru3")
+        val username = authentication.name
+
+        return operacionService.obtenerResumenPaginado(page, size, username)
     }
 
     @GetMapping("/obtener-usuario")
@@ -39,4 +44,10 @@ class OperacionController(
     fun registrar(@Valid @RequestBody request: RegistrarOperacionRequest): ResponseEntity<RegistrarOperacionResponse> {
         return ResponseEntity.status(HttpStatus.CREATED).body(operacionService.registrar(request))
     }
+
+
+
+
+
+
 }

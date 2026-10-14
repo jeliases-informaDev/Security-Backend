@@ -18,10 +18,10 @@ class RegistroOperacionesEntity(
     val idUsuario: Int,
 
     val empresa: String,
-    val oficina: String,
+    var oficina: String,
 
     @Column(name = "fecha_registro")
-    val fechaRegistro: LocalDate,
+    var fechaRegistro: LocalDate,
 
     @Column(name = "fecha_creacion")
     val fechaCreacion: LocalDateTime = LocalDateTime.now(),
@@ -33,15 +33,17 @@ class RegistroOperacionesEntity(
 
     @OneToOne(cascade = [CascadeType.PERSIST], fetch = FetchType.LAZY)
     @JoinColumn(name = "id_persona_representada", unique = true)
-    val personaRepresentada: Persona?,
+    var personaRepresentada: Persona?,
 
     // Operación asociada
     @OneToOne(cascade = [CascadeType.ALL])
     @JoinColumn(name = "id_operacion", nullable = false, unique = true)
     val operacion: Operacion,
 
-    // Lista de beneficiarios
+    beneficiarios: List<BeneficiarioEntity> = emptyList()
+) {
+    // Mantener la colección administrada por Hibernate permite eliminar los huérfanos.
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
     @JoinColumn(name = "registro_id")
-    val beneficiarios: List<BeneficiarioEntity> = emptyList()
-)
+    val beneficiarios: MutableList<BeneficiarioEntity> = beneficiarios.toMutableList()
+}

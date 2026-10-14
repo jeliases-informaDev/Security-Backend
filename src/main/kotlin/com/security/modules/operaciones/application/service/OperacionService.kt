@@ -12,13 +12,15 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import com.security.modules.operaciones.domain.*
+import com.security.shared.datos.repositories.UsuarioRepository
 import com.tuempresa.operaciones.dto.RegistrarOperacionRequest
 import com.tuempresa.operaciones.dto.PersonaDto
 import java.util.UUID
 
 @Service
 class OperacionService(
-    private val operacionRepository: OperacionRepository
+    private val operacionRepository: OperacionRepository,
+    private val usuarioRepository: UsuarioRepository
 ) {
 
     @Transactional
@@ -78,11 +80,19 @@ class OperacionService(
         it.distrito = distrito
     }
 
-    fun obtenerResumenPaginado(page: Int, size: Int): ListarOperacionesResponse {
-        val pageable = PageRequest.of(page, size)
-        val resultadoPage = operacionRepository.listarResumen(pageable)
+    fun obtenerResumenPaginado(page: Int, size: Int, username: String): ListarOperacionesResponse {
+        // 1. Buscamos el usuario en tu base de datos usando el método que ya soporta tu repositorio
+        val usuario = usuarioRepository.findByUsuario(username)
+            ?: throw RuntimeException("Usuario no encontrado")
 
-        // Mapeamos la proyección a nuestro DTO limpio
+        // 2. Obtenemos el nombre de la empresa directamente de la entidad Usuario
+        val nombreEmpresa = usuario.empresa ?: ""
+
+        // 3. Configuramos la paginación y llamamos al repositorio filtrando por empresa
+        val pageable = PageRequest.of(page, size)
+        val resultadoPage = operacionRepository.listarResumenPorEmpresa(nombreEmpresa, pageable)
+
+        // 4. Mapeamos la proyección al DTO de respuesta
         val items = resultadoPage.content.map { proj ->
             OperacionItemDto(
                 id = proj.id,
@@ -113,8 +123,4 @@ class OperacionService(
             empresa = usuarioEncontrado.empresa ?: ""
         )
     }
-
-
-
-
 }

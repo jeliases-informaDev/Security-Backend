@@ -12,26 +12,26 @@ class Operacion(
     val id: Long? = null,
 
     @Column(name = "fecha_operacion")
-    val fechaOperacion: LocalDate,
+    var fechaOperacion: LocalDate,
 
-    val lugar: String?,
+    var lugar: String?,
 
     @Column(name = "modalidad_pago")
-    val modalidadPago: String,
+    var modalidadPago: String,
 
-    val moneda: String,
+    var moneda: String,
     @Column(precision = 15, scale = 2)
-    val monto: BigDecimal,
+    var monto: BigDecimal,
 
     @Column(name = "tipo_operacion")
-    val tipoOperacion: String,
+    var tipoOperacion: String,
 
     @Column(name = "nro_cuenta_1")
-    val cuenta1: String?,
+    var cuenta1: String?,
 
     @Column(name = "nro_cuenta_2")
-    val cuenta2: String?,
+    var cuenta2: String?,
 
     @Column(name = "nro_cuenta_3")
-    val cuenta3: String?
+    var cuenta3: String?
 )

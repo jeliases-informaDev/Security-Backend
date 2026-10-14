@@ -43,10 +43,12 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
 
     implementation("org.springframework.security:spring-security-crypto")
-
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13")
     implementation("org.apache.pdfbox:pdfbox:3.0.8")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.mockk:mockk:1.13.8")
+    implementation("org.apache.pdfbox:pdfbox:3.0.6")
 
     implementation(
         platform(

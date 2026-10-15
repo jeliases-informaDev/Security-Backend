@@ -25,7 +25,7 @@ import kotlin.test.*
 class OperacionPdfTest {
     private val repository = mockk<OperacionRepository>()
     private val controller = OperacionPdfController(ExportarOperacionPdfUseCase(
-        OperacionConsultaAdapter(repository), PdfBoxGeneradorPdfAdapter()
+        OperacionConsultaAdapter(repository, mockk()), PdfBoxGeneradorPdfAdapter()
     ))
     private val mvc = MockMvcBuilders.standaloneSetup(controller).build()
 

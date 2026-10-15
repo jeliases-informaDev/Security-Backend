@@ -40,6 +40,9 @@ class RegistroOperacionesEntity(
     @JoinColumn(name = "id_operacion", nullable = false, unique = true)
     val operacion: Operacion,
 
+    @Column(name = "id_usuario_responsable")
+    var idUsuarioResponsable: Int? = null,
+
     beneficiarios: List<BeneficiarioEntity> = emptyList()
 ) {
     // Mantener la colección administrada por Hibernate permite eliminar los huérfanos.

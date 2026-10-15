@@ -4,12 +4,24 @@ import com.security.modules.operaciones.domain.RegistroOperacionesEntity
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 
 @Repository
 interface OperacionRepository : JpaRepository<RegistroOperacionesEntity, Long> {
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        UPDATE RegistroOperacionesEntity r SET r.idUsuario = :usuarioNuevoId
+        WHERE r.id = :id AND r.idUsuario = :usuarioAnteriorId
+    """)
+    fun cambiarUsuario(
+        @Param("id") id: Long,
+        @Param("usuarioAnteriorId") usuarioAnteriorId: Int,
+        @Param("usuarioNuevoId") usuarioNuevoId: Int
+    ): Int
 
     @Query(value = "SELECT usuario FROM usuarios WHERE id = :id", nativeQuery = true)
     fun buscarNombreUsuarioPorId(@Param("id") id: Int): String?
@@ -77,15 +89,17 @@ interface OperacionRepository : JpaRepository<RegistroOperacionesEntity, Long> {
                 r.oficina AS oficina,
                 r.fecha_registro AS fecha
             FROM registro_operaciones_v2 r
+            JOIN usuarios u ON u.id = r.id_usuario
             LEFT JOIN personas_operacion pf
                 ON pf.id = r.id_persona_fisica
             LEFT JOIN personas_operacion pr
                 ON pr.id = r.id_persona_representada
-            WHERE r.id = :id
+            WHERE u.empresa = :nombreEmpresa
+            ORDER BY r.fecha_registro DESC, r.id DESC
         """,
         nativeQuery = true
     )
-    fun buscarResumenPorId(
-        @Param("id") id: Long
-    ): OperacionResumenProjection?
+    fun buscarResumenPorEmpresa(
+        @Param("nombreEmpresa") nombreEmpresa: String
+    ): List<OperacionResumenProjection>
 }

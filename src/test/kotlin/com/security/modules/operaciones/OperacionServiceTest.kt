@@ -14,7 +14,7 @@ import kotlin.test.*
 
 class OperacionServiceTest {
     private val repository = mockk<OperacionRepository>()
-    private val service = OperacionService(repository)
+    private val service = OperacionService(repository, mockk())
     private val date = LocalDate.of(2026, 10, 12)
 
     private fun request() = RegistrarOperacionRequest(
@@ -24,7 +24,8 @@ class OperacionServiceTest {
         null,
         OperacionDto(date, null, "Transferencia", "PEN", BigDecimal("1250.25"),
             "Deposito", "001", null, null),
-        listOf(BeneficiarioDto("Luis", "DNI", "87654321", date.minusYears(25)))
+        listOf(BeneficiarioDto("Luis", "DNI", "87654321", date.minusYears(25))),
+        numeroRegistro = "  REG-2026-001  "
     )
 
     private fun usuario() {
@@ -51,7 +52,7 @@ class OperacionServiceTest {
         assertNull(saved.captured.personaRepresentada)
         assertEquals("Luis", saved.captured.beneficiarios.single().nombre)
         assertEquals(7, saved.captured.idUsuario)
-        assertTrue(saved.captured.numeroRegistro!!.startsWith("OP-"))
+        assertEquals("REG-2026-001", saved.captured.numeroRegistro)
     }
 
     @Test

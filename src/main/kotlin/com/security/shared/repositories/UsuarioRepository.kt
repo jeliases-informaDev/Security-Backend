@@ -20,6 +20,15 @@ interface UsuarioRepository : JpaRepository<Usuario, Int> {
         @Param("usuario") usuario: String
     ): Usuario?
 
+    @Query("""
+        SELECT u FROM Usuario u
+        WHERE LOWER(TRIM(u.empresa)) = LOWER(TRIM(:empresa))
+        ORDER BY u.nombres, u.apePat, u.id
+    """)
+    fun findAllByEmpresaOrderByNombresAscApePatAscIdAsc(@Param("empresa") empresa: String): List<Usuario>
+
+    fun findAllByEmpresaAndActivoTrueOrderByNombresAscApePatAsc(empresa: String): List<Usuario>
+
     fun findByCorreo(
         correo: String
     ): Usuario?

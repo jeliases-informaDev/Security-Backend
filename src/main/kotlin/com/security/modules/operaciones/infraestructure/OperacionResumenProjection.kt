@@ -9,6 +9,8 @@ interface OperacionResumenProjection {
     val personaNombre: String?
     val oficina: String?
     val fecha: LocalDate?
+    val responsableId: Int?
+    val responsableNombre: String?
 }
 
 interface UsuarioProjection {

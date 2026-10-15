@@ -5,8 +5,20 @@ import com.security.modules.operaciones.dto.*
 import jakarta.persistence.EntityManager
 import org.springframework.stereotype.Repository
 
+enum class CatalogoExportacion(val tabla: String) {
+    DOCUMENTO("tipo_documento"), PAIS("pais"), OCUPACION("scoring_ocupacion"),
+    DEPARTAMENTO("scoring_departamento"), PROVINCIA("provincia"),
+    MONEDA("monedas")
+}
+
 @Repository
 class CatalogoRepository(private val em: EntityManager) {
+
+    // Incluye opciones inactivas para poder exportar registros historicos.
+    fun nombreParaExportacion(catalogo: CatalogoExportacion, id: Long): String? =
+        em.createNativeQuery("select nombre from ${catalogo.tabla} where id = :id")
+            .setParameter("id", id)
+            .resultList.firstOrNull() as String?
 
     fun monedas(): List<MonedaOpcionResponse> =
         em.createNativeQuery("select id, codigo, nombre, simbolo from monedas where activo = 1 order by nombre")

@@ -4,6 +4,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -12,7 +13,8 @@ data class RegistrarOperacionRequest(
     @field:Valid @field:NotNull val personaFisica: PersonaDto,
     @field:Valid val personaRepresentada: PersonaDto?,
     @field:Valid @field:NotNull val operacion: OperacionDto,
-    @field:Valid @field:NotEmpty val beneficiarios: List<BeneficiarioDto>
+    @field:Valid @field:NotEmpty val beneficiarios: List<BeneficiarioDto>,
+    @field:NotBlank @field:Size(max = 50) val numeroRegistro: String
 )
 
 data class RegistroDto(

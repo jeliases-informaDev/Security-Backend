@@ -17,5 +17,6 @@ data class OperacionItemDto(
     val personaNombre: String?,
     val oficina: String?,
     // Fecha de registro; se conserva el nombre JSON usado por el frontend.
-    val fecha: LocalDate?
+    val fecha: LocalDate?,
+    val responsable: UsuarioAsignableResponse? = null
 )

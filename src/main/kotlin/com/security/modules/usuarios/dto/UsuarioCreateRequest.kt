@@ -21,6 +21,8 @@ data class UsuarioCreateRequest(
     val apePat: String? = null,
     val apeMat: String? = null,
     val cargo: String? = null,
+    // Debe ser una empresa de la lista (GET /api/empresas); se valida al crear.
+    @field:NotBlank(message = "La empresa es obligatoria")
     val empresa: String? = null,
 
     @field:NotBlank(message = "El rol es obligatorio")

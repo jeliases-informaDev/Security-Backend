@@ -1,7 +1,9 @@
 package com.security.modules.usuarios.controller.infraestructure
 
 import com.security.modules.usuarios.application.service.UsuarioService
+import com.security.modules.usuarios.dto.CambiarEmpresaRequest
 import com.security.modules.usuarios.dto.CambiarRolRequest
+import com.security.modules.usuarios.dto.RolResponse
 import com.security.modules.usuarios.dto.UsuarioCreateRequest
 import com.security.modules.usuarios.dto.UsuarioResponse
 import jakarta.validation.Valid
@@ -36,6 +38,21 @@ class UsuarioController(
         @Valid @RequestBody request: CambiarRolRequest
     ): ResponseEntity<UsuarioResponse> {
         return ResponseEntity.ok(usuarioService.cambiarRol(id, request))
+    }
+
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PutMapping("/{id}/empresa")
+    fun cambiarEmpresa(
+        @PathVariable id: Int,
+        @Valid @RequestBody request: CambiarEmpresaRequest
+    ): ResponseEntity<UsuarioResponse> {
+        return ResponseEntity.ok(usuarioService.cambiarEmpresa(id, request))
+    }
+
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @GetMapping("/roles")
+    fun listarRoles(): ResponseEntity<List<RolResponse>> {
+        return ResponseEntity.ok(usuarioService.listarRoles())
     }
 
     @PreAuthorize("hasRole('ADMINISTRADOR')")

@@ -29,6 +29,23 @@ interface UsuarioRepository : JpaRepository<Usuario, Int> {
 
     fun findAllByEmpresaAndActivoTrueOrderByNombresAscApePatAsc(empresa: String): List<Usuario>
 
+    // Nombres de empresa escritos en las cuentas, sin espacios sobrantes (para armar la lista de empresas).
+    @Query("""
+        SELECT DISTINCT TRIM(u.empresa)
+        FROM Usuario u
+        WHERE u.empresa IS NOT NULL AND TRIM(u.empresa) <> ''
+    """)
+    fun findEmpresasEnUso(): List<String>
+
+    // Cuantas cuentas tiene cada empresa; el nombre llega en minusculas y sin espacios sobrantes.
+    @Query("""
+        SELECT LOWER(TRIM(u.empresa)) AS nombre, COUNT(u) AS cuentas
+        FROM Usuario u
+        WHERE u.empresa IS NOT NULL AND TRIM(u.empresa) <> ''
+        GROUP BY LOWER(TRIM(u.empresa))
+    """)
+    fun contarCuentasPorEmpresa(): List<CuentasPorEmpresa>
+
     fun findByCorreo(
         correo: String
     ): Usuario?
@@ -68,4 +85,9 @@ interface UsuarioRepository : JpaRepository<Usuario, Int> {
         @Param("codigos")
         codigos: Collection<String>
     ): List<Usuario>
+}
+/** Fila de contarCuentasPorEmpresa: el nombre va en minusculas y sin espacios sobrantes. */
+interface CuentasPorEmpresa {
+    val nombre: String
+    val cuentas: Long
 }

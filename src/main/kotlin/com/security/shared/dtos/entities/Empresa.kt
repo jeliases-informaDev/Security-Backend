@@ -1,0 +1,38 @@
+package com.security.shared.datos.entities
+
+import jakarta.persistence.*
+import java.time.LocalDateTime
+
+/**
+ * Empresa cliente de la plataforma. Cada cuenta pertenece a una: usuarios.empresa guarda su nombre y
+ * el modulo de operaciones solo muestra los registros de la empresa del usuario que entro.
+ *
+ * Esta tabla es la lista de empresas entre las que se elige al crear una cuenta, para que el nombre
+ * quede escrito siempre igual. El nombre no se renombra: para corregir uno mal escrito se crea la
+ * empresa correcta y se pasan las cuentas a ella.
+ */
+@Entity
+@Table(name = "empresas")
+class Empresa(
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    var id: Int? = null,
+
+    @Column(name = "nombre", nullable = false, unique = true)
+    var nombre: String,
+
+    @Column(name = "ruc", length = 11, unique = true)
+    var ruc: String? = null,
+
+    // Una empresa inactiva ya no se ofrece al crear cuentas (las que ya tiene siguen funcionando).
+    @Column(name = "activa", nullable = false)
+    var activa: Boolean = true,
+
+    @Column(name = "fecha_creacion", nullable = false)
+    var fechaCreacion: LocalDateTime? = null,
+
+    @Column(name = "fecha_actualizacion", nullable = false)
+    var fechaActualizacion: LocalDateTime? = null
+)

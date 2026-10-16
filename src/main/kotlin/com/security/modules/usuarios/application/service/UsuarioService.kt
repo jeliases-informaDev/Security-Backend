@@ -1,7 +1,10 @@
 package com.security.modules.usuarios.application.service
 
+import com.security.modules.empresas.application.service.EmpresaService
+import com.security.modules.usuarios.dto.CambiarEmpresaRequest
 import com.security.modules.usuarios.dto.CambiarRolRequest
 import com.security.modules.usuarios.dto.UsuarioCreateRequest
+import com.security.modules.usuarios.dto.RolResponse
 import com.security.modules.usuarios.dto.UsuarioResponse
 import com.security.shared.datos.entities.Usuario
 import com.security.shared.datos.entities.UsuarioRol
@@ -20,7 +23,8 @@ class UsuarioService(
     private val usuarioRepository: UsuarioRepository,
     private val rolesRepository: RolesRepository,
     private val usuarioRolRepository: UsuarioRolRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+    private val empresaService: EmpresaService
 ) {
 
     fun listar(): List<UsuarioResponse> {
@@ -40,6 +44,9 @@ class UsuarioService(
         val rol = rolesRepository.findByCodigo(request.rolCodigo)
             ?: throw ResourceNotFoundException("El rol '${request.rolCodigo}' no existe")
 
+        // La empresa se elige de la lista de empresas; se guarda con el nombre exacto de la lista.
+        val empresa = empresaService.resolverActiva(request.empresa)
+
         val now = LocalDateTime.now()
 
         val usuario = Usuario(
@@ -50,7 +57,7 @@ class UsuarioService(
             apePat = request.apePat,
             apeMat = request.apeMat,
             cargo = request.cargo,
-            empresa = request.empresa,
+            empresa = empresa,
             activo = true,
             fechaCreacion = now,
             fechaActualizacion = now
@@ -80,6 +87,29 @@ class UsuarioService(
         usuario.roles = mutableListOf(UsuarioRol(usuario = usuario, rol = rol))
 
         return usuario.toResponse()
+    }
+
+    /**
+     * Pasa la cuenta a otra empresa de la lista. Los registros de operaciones que la cuenta ya hizo
+     * van con ella (el modulo de operaciones los muestra segun la empresa de su usuario).
+     */
+    @Transactional
+    fun cambiarEmpresa(usuarioId: Int, request: CambiarEmpresaRequest): UsuarioResponse {
+
+        val usuario = usuarioRepository.findById(usuarioId)
+            .orElseThrow { ResourceNotFoundException("Usuario no encontrado") }
+
+        usuario.empresa = empresaService.resolverActiva(request.empresa)
+        usuario.fechaActualizacion = LocalDateTime.now()
+
+        return usuarioRepository.save(usuario).toResponse()
+    }
+
+    fun listarRoles(): List<RolResponse> {
+        return rolesRepository.findAll()
+            .filter { it.activo }
+            .sortedBy { it.nombre }
+            .map { RolResponse(codigo = it.codigo, nombre = it.nombre) }
     }
 
     @Transactional

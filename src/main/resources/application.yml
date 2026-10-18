@@ -42,6 +42,12 @@ cors:
 
 # Datos iniciales de desarrollo (rol admin, usuario y catalogos). Solo para bases locales nuevas.
 app:
+  # Direccion de la web (para los enlaces de los correos); el kit la pone en WEB_URL
+  frontend-url: ${WEB_URL:http://localhost:3000}
+  # Remitente de los correos. El correo de salida se enciende con SPRING_MAIL_HOST (y puerto, usuario, clave); sin eso, los enlaces van al log.
+  mail:
+    from: ${APP_MAIL_FROM:no-reply@sulotec.com}
+    nombre: ${APP_MAIL_NOMBRE:PLAFT}
   seed:
     enabled: ${APP_SEED_ENABLED:false}
     admin-user: ${APP_SEED_ADMIN_USER:superadmin}

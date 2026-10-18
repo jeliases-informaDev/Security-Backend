@@ -9,7 +9,10 @@ data class EmpresaCreateRequest(
     val nombre: String,
 
     // Opcional; si viene, 11 digitos.
-    val ruc: String? = null
+    val ruc: String? = null,
+
+    // Opcional: 2 a 8 letras o digitos; si no viene se propone a partir del nombre.
+    val sigla: String? = null
 )
 
 /** El nombre no se cambia (ver Empresa); solo se puede corregir el RUC. */
@@ -19,6 +22,8 @@ data class EmpresaUpdateRequest(
 
 data class EmpresaResponse(
     val id: Int,
+    val uuid: String?,
+    val sigla: String?,
     val nombre: String,
     val ruc: String?,
     val activa: Boolean,

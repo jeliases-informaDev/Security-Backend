@@ -8,6 +8,11 @@ import com.security.shared.datos.repositories.EmpresaRepository
 import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.exceptions.ConflictException
 import com.security.shared.exceptions.ResourceNotFoundException
+import com.security.shared.security.SIGLA_VALIDA
+import com.security.shared.security.normalizarSigla
+import com.security.shared.security.siglaLibre
+import com.security.shared.security.siglaSugerida
+import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -44,10 +49,19 @@ class EmpresaService(
         if (ruc != null && empresaRepository.findByRuc(ruc) != null) {
             throw ConflictException("Ya existe una empresa con ese RUC")
         }
+        val sigla = normalizarSigla(request.sigla)?.also {
+            if (!SIGLA_VALIDA.matches(it)) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "La sigla debe tener de 2 a 8 letras o números")
+            }
+            if (empresaRepository.existsBySiglaIgnoreCase(it)) {
+                throw ConflictException("Ya existe una empresa con esa sigla")
+            }
+        } ?: siglaLibre(siglaSugerida(nombre)) { empresaRepository.existsBySiglaIgnoreCase(it) }
 
         val ahora = LocalDateTime.now()
         val guardada = empresaRepository.save(
-            Empresa(nombre = nombre, ruc = ruc, activa = true, fechaCreacion = ahora, fechaActualizacion = ahora)
+            Empresa(nombre = nombre, ruc = ruc, uuid = UUID.randomUUID().toString(), sigla = sigla, activa = true,
+                fechaCreacion = ahora, fechaActualizacion = ahora)
         )
         return guardada.toResponse(0L)
     }
@@ -83,7 +97,11 @@ class EmpresaService(
      * nombre quede siempre escrito igual.
      */
     @Transactional(readOnly = true)
-    fun resolverActiva(nombre: String?): String {
+    fun resolverActiva(nombre: String?): String = resolverEmpresaActiva(nombre).nombre
+
+    /** La empresa de la lista (activa) con ese nombre, o 400. */
+    @Transactional(readOnly = true)
+    fun resolverEmpresaActiva(nombre: String?): Empresa {
         val buscado = nombre?.trim().orEmpty()
         if (buscado.isEmpty()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "La empresa es obligatoria")
@@ -93,7 +111,7 @@ class EmpresaService(
         if (!empresa.activa) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "La empresa '${empresa.nombre}' está inactiva")
         }
-        return empresa.nombre
+        return empresa
     }
 
     private fun buscar(id: Int): Empresa =
@@ -115,6 +133,8 @@ class EmpresaService(
 
     private fun Empresa.toResponse(cuentas: Long) = EmpresaResponse(
         id = this.id!!,
+        uuid = this.uuid,
+        sigla = this.sigla,
         nombre = this.nombre,
         ruc = this.ruc,
         activa = this.activa,

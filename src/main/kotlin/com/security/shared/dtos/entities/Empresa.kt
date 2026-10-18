@@ -26,6 +26,14 @@ class Empresa(
     @Column(name = "ruc", length = 11, unique = true)
     var ruc: String? = null,
 
+    // Identificador publico, estable y no adivinable (se asigna al crear; a las empresas viejas, al arrancar).
+    @Column(name = "uuid", length = 36, unique = true)
+    var uuid: String? = null,
+
+    // Sigla unica (2 a 8 letras o digitos): va delante del usuario de cada cuenta, p. ej. "hcyo.jperez".
+    @Column(name = "sigla", length = 8, unique = true)
+    var sigla: String? = null,
+
     // Una empresa inactiva ya no se ofrece al crear cuentas (las que ya tiene siguen funcionando).
     @Column(name = "activa", nullable = false)
     var activa: Boolean = true,

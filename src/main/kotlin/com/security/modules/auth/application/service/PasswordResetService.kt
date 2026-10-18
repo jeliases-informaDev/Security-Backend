@@ -1,6 +1,7 @@
 package com.security.modules.auth.application.service
 
 import com.security.modules.auth.domain.PasswordResetToken
+import com.security.shared.datos.entities.Usuario
 import com.security.modules.auth.infrastructure.PasswordResetTokenRepository
 import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.exceptions.InvalidTokenException
@@ -61,6 +62,21 @@ class PasswordResetService(
 
         resetToken.usado = true
         tokenRepository.save(resetToken)
+    }
+
+    /** Enlace para que una cuenta nueva elija su clave: un solo uso, con validez en horas (invitaciones). */
+    @Transactional
+    fun crearTokenInvitacion(usuario: Usuario, horasValidez: Long): String {
+        tokenRepository.invalidarPendientesDe(usuario.id!!)
+        val token = UUID.randomUUID().toString()
+        tokenRepository.save(
+            PasswordResetToken(
+                usuario = usuario,
+                token = token,
+                fechaExpiracion = LocalDateTime.now().plusHours(horasValidez)
+            )
+        )
+        return token
     }
 
     companion object {

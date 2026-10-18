@@ -14,4 +14,8 @@ interface EmpresaRepository : JpaRepository<Empresa, Int> {
     fun existsByNombreIgnoreCase(nombre: String): Boolean
 
     fun findByRuc(ruc: String): Empresa?
+
+    fun existsBySiglaIgnoreCase(sigla: String): Boolean
+
+    fun findByUuid(uuid: String): Empresa?
 }

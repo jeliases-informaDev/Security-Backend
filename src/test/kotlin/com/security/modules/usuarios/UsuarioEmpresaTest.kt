@@ -4,6 +4,7 @@ import com.security.modules.empresas.application.service.EmpresaService
 import com.security.modules.usuarios.application.service.UsuarioService
 import com.security.modules.usuarios.dto.CambiarEmpresaRequest
 import com.security.modules.usuarios.dto.UsuarioCreateRequest
+import com.security.shared.datos.entities.Empresa
 import com.security.shared.datos.entities.Roles
 import com.security.shared.datos.entities.Usuario
 import com.security.shared.datos.repositories.RolesRepository
@@ -47,12 +48,15 @@ class UsuarioEmpresaTest {
     @Test
     fun `crear guarda la cuenta con el nombre exacto de la empresa de la lista`() {
         prepararCreacion()
-        every { empresaService.resolverActiva("peru luz") } returns "Peru Luz S.A.C"
+        every { empresaService.resolverEmpresaActiva("peru luz") } returns Empresa(id = 1, nombre = "Peru Luz S.A.C", sigla = "PLZ", uuid = "u")
+        every { usuarios.existsByUsuario("plz.ana") } returns false
         val guardado = slot<Usuario>()
         every { usuarios.save(capture(guardado)) } answers { guardado.captured.also { it.id = 5 } }
 
         val respuesta = service.crear(solicitud())
 
+        // el usuario interno lleva la sigla de la empresa delante
+        assertEquals("plz.ana", guardado.captured.usuario)
         assertEquals("Peru Luz S.A.C", guardado.captured.empresa)
         assertEquals("Peru Luz S.A.C", respuesta.empresa)
         assertEquals("USUARIO", respuesta.rolCodigo)
@@ -61,7 +65,7 @@ class UsuarioEmpresaTest {
     @Test
     fun `crear no guarda nada si la empresa no esta en la lista o no se indica`() {
         prepararCreacion()
-        every { empresaService.resolverActiva(any()) } throws ResponseStatusException(HttpStatus.BAD_REQUEST, "La empresa es obligatoria")
+        every { empresaService.resolverEmpresaActiva(any()) } throws ResponseStatusException(HttpStatus.BAD_REQUEST, "La empresa es obligatoria")
 
         listOf(null, "", "Fantasma").forEach {
             val error = assertFailsWith<ResponseStatusException> { service.crear(solicitud(it)) }

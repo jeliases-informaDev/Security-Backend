@@ -31,6 +31,15 @@ class UsuarioService(
         return usuarioRepository.findAllConRoles().map { it.toResponse() }
     }
 
+    /** Solo las cuentas de la empresa de quien pide; sin empresa, ninguna. */
+    fun listarDeMiEmpresa(username: String): List<UsuarioResponse> {
+        val empresa = usuarioRepository.findByUsuario(username)?.empresa?.trim()?.takeIf { it.isNotEmpty() }
+            ?: return emptyList()
+        return usuarioRepository.findAllConRoles()
+            .filter { it.empresa?.trim().equals(empresa, ignoreCase = true) }
+            .map { it.toResponse() }
+    }
+
     @Transactional
     fun crear(request: UsuarioCreateRequest): UsuarioResponse {
 

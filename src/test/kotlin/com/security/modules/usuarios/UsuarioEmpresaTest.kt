@@ -100,6 +100,21 @@ class UsuarioEmpresaTest {
     }
 
     @Test
+    fun `listarDeMiEmpresa devuelve solo las cuentas de la empresa de quien pide y nada si no tiene`() {
+        val ahora = LocalDateTime.now()
+        val cuenta = { id: Int, nombre: String, empresa: String? ->
+            Usuario(id = id, usuario = nombre, clave = "x", correo = "$nombre@example.test", empresa = empresa,
+                fechaCreacion = ahora, fechaActualizacion = ahora)
+        }
+        every { usuarios.findByUsuario("ana") } returns cuenta(1, "ana", " Gamma ")
+        every { usuarios.findByUsuario("solo") } returns cuenta(4, "solo", null)
+        every { usuarios.findAllConRoles() } returns listOf(cuenta(1, "ana", "Gamma"), cuenta(2, "luis", "Delta"), cuenta(3, "maria", "gamma"))
+
+        assertEquals(listOf("ana", "maria"), service.listarDeMiEmpresa("ana").map { it.usuario })
+        assertTrue(service.listarDeMiEmpresa("solo").isEmpty())
+    }
+
+    @Test
     fun `listarRoles devuelve solo los roles activos ordenados por nombre`() {
         every { roles.findAll() } returns listOf(
             rol("USUARIO", "Usuario"),

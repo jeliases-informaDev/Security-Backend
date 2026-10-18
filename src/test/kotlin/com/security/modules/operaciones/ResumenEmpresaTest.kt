@@ -1,5 +1,6 @@
 package com.security.modules.operaciones
 
+import com.security.modules.operaciones.application.service.AccesoEmpresaService
 import com.security.modules.operaciones.application.service.OperacionService
 import com.security.modules.operaciones.controller.infrastructure.OperacionController
 import com.security.modules.operaciones.infraestructure.OperacionRepository
@@ -16,20 +17,24 @@ class ResumenEmpresaTest {
     private val operaciones = mockk<OperacionRepository>()
     private val usuarios = mockk<UsuarioRepository>()
     private val service = OperacionService(operaciones, usuarios)
+    private val acceso = mockk<AccesoEmpresaService>()
+    private val controller = OperacionController(service, acceso)
 
     @Test
-    fun `usa empresa del frontend y conserva contenido y paginacion`() {
+    fun `el controlador lista la empresa que decide el acceso, no la que manda el cliente`() {
         val pagina = PageRequest.of(1, 2)
         val fila = mockk<OperacionResumenProjection>(relaxed = true)
         every { fila.id } returns 42L
+        // Una cuenta comun pide "Otra" pero el acceso resuelve su propia empresa
+        every { acceso.empresaPermitida("Otra") } returns "Peru Luz S.A.C"
         every { operaciones.listarResumenPorEmpresa("Peru Luz S.A.C", pagina) } returns
             PageImpl(listOf(fila), pagina, 3L)
-        val resultado = OperacionController(service).listarResumen(" Peru Luz S.A.C ", 1, 2)
+        val resultado = controller.listarResumen("Otra", 1, 2)
         assertEquals(42L, resultado.content.single().id)
         assertEquals(1, resultado.currentPage)
         assertEquals(2, resultado.totalPages)
         assertEquals(3L, resultado.totalElements)
-        verify { usuarios wasNot Called }
+        verify(exactly = 0) { operaciones.listarResumenPorEmpresa("Otra", any()) }
     }
 
     @Test

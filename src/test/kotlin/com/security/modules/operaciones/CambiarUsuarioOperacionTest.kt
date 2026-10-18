@@ -1,5 +1,6 @@
 package com.security.modules.operaciones
 
+import com.security.modules.operaciones.application.service.AccesoEmpresaService
 import com.security.modules.operaciones.application.service.OperacionService
 import com.security.modules.operaciones.controller.infrastructure.OperacionController
 import com.security.modules.operaciones.domain.RegistroOperacionesEntity
@@ -17,6 +18,7 @@ class CambiarUsuarioOperacionTest {
     private val operaciones = mockk<OperacionRepository>()
     private val usuarios = mockk<UsuarioRepository>()
     private val service = OperacionService(operaciones, usuarios)
+    private val acceso = mockk<AccesoEmpresaService>(relaxed = true)
     private fun usuario(id: Int, empresa: String? = "Peru Luz S.A.C", activo: Boolean = true) =
         Usuario(id = id, usuario = "usuario$id", clave = "test", correo = "$id@example.test",
             nombres = "Ana", apePat = "Perez", empresa = empresa, activo = activo)
@@ -33,7 +35,8 @@ class CambiarUsuarioOperacionTest {
     fun `endpoint cambia id usuario usando la empresa del usuario anterior`() {
         preparar()
         every { operaciones.cambiarUsuario(77L, 1, 2) } returns 1
-        val resultado = OperacionController(service).cambiarUsuarioOperacion(77L, CambiarUsuarioOperacionRequest(2))
+        val resultado = OperacionController(service, acceso).cambiarUsuarioOperacion(77L, CambiarUsuarioOperacionRequest(2))
+        verify(exactly = 1) { acceso.comprobarRegistro(77L) }
         assertEquals(77L, resultado.id)
         assertEquals(2, resultado.usuarioId)
         assertEquals("Ana Perez", resultado.nombreCompleto)

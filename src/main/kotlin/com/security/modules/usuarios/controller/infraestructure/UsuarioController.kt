@@ -10,7 +10,9 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
+import com.security.shared.security.esAdministrador
 
 @RestController
 @RequestMapping("/api/usuarios")
@@ -18,10 +20,13 @@ class UsuarioController(
     private val usuarioService: UsuarioService
 ) {
 
-    // Disponible para cualquier usuario autenticado (todos los roles la tienen asignada)
+    // Un ADMINISTRADOR ve todas las cuentas; cualquier otra cuenta solo las de su propia empresa
+    // (los clientes no deben saber unos de otros).
     @GetMapping
-    fun listar(): ResponseEntity<List<UsuarioResponse>> {
-        return ResponseEntity.ok(usuarioService.listar())
+    fun listar(authentication: Authentication): ResponseEntity<List<UsuarioResponse>> {
+        val cuentas = if (authentication.esAdministrador()) usuarioService.listar()
+        else usuarioService.listarDeMiEmpresa(authentication.name)
+        return ResponseEntity.ok(cuentas)
     }
 
     @PreAuthorize("hasRole('ADMINISTRADOR')")

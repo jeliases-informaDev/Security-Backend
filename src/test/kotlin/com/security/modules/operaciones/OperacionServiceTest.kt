@@ -31,6 +31,7 @@ class OperacionServiceTest {
     private fun usuario() {
         val user = mockk<UsuarioProjection>()
         every { user.id } returns 7
+        every { user.empresa } returns "Empresa de la cuenta"
         every { repository.buscarPorUsuario("demo") } returns user
     }
 
@@ -52,6 +53,8 @@ class OperacionServiceTest {
         assertNull(saved.captured.personaRepresentada)
         assertEquals("Luis", saved.captured.beneficiarios.single().nombre)
         assertEquals(7, saved.captured.idUsuario)
+        // la empresa guardada es la de la cuenta, no el texto del pedido
+        assertEquals("Empresa de la cuenta", saved.captured.empresa)
         assertEquals("REG-2026-001", saved.captured.numeroRegistro)
     }
 

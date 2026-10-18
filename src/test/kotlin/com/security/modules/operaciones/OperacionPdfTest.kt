@@ -1,6 +1,9 @@
 package com.security.modules.operaciones
 
 import com.security.modules.operaciones.application.usecase.ExportarOperacionPdfUseCase
+import com.security.modules.operaciones.application.service.AccesoEmpresaService
+import com.security.shared.exceptions.ResourceNotFoundException
+import org.springframework.http.MediaType
 import com.security.modules.operaciones.domain.*
 import com.security.modules.operaciones.infraestructure.OperacionRepository
 import com.security.modules.operaciones.infrastructure.adapter.`in`.web.OperacionPdfController
@@ -26,7 +29,7 @@ class OperacionPdfTest {
     private val repository = mockk<OperacionRepository>()
     private val controller = OperacionPdfController(ExportarOperacionPdfUseCase(
         OperacionConsultaAdapter(repository, mockk()), PdfBoxGeneradorPdfAdapter()
-    ))
+    ), mockk(relaxed = true))
     private val mvc = MockMvcBuilders.standaloneSetup(controller).build()
 
     @Test
@@ -87,5 +90,21 @@ class OperacionPdfTest {
         assertEquals(404, mvc.perform(get("/api/operaciones/999/exportar-pdf")).andReturn().response.status)
         assertEquals(400, mvc.perform(get("/api/operaciones/0/exportar-pdf")).andReturn().response.status)
         verify(exactly = 0) { repository.findById(0) }
+    }
+
+    @Test
+    fun `un registro de otra empresa responde 404 aunque el cliente solo acepte PDF`() {
+        val acceso = mockk<AccesoEmpresaService>()
+        every { acceso.comprobarRegistro(42L) } throws ResourceNotFoundException("No existe un registro de operación con ID 42")
+        val ajeno = MockMvcBuilders.standaloneSetup(OperacionPdfController(
+            ExportarOperacionPdfUseCase(OperacionConsultaAdapter(repository, mockk()), PdfBoxGeneradorPdfAdapter()), acceso
+        )).build()
+        val respuesta = ajeno.perform(get("/api/operaciones/42/exportar-pdf").accept(MediaType.APPLICATION_PDF)).andReturn().response
+        assertEquals(404, respuesta.status)
+        assertTrue(respuesta.contentAsString.contains("No existe"))
+        // y un registro inexistente con el mismo Accept tambien responde 404, no 406
+        every { repository.findById(999) } returns Optional.empty()
+        assertEquals(404, mvc.perform(get("/api/operaciones/999/exportar-pdf").accept(MediaType.APPLICATION_PDF)).andReturn().response.status)
+        verify(exactly = 0) { repository.findById(42) }
     }
 }

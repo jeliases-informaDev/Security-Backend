@@ -16,7 +16,7 @@ import java.math.BigDecimal
 class OperacionDetalleTest {
     private val consulta = mockk<OperacionConsultaPort>()
     private val mvc = MockMvcBuilders.standaloneSetup(
-        OperacionDetalleController(ObtenerDetalleOperacionUseCase(consulta), mockk())
+        OperacionDetalleController(ObtenerDetalleOperacionUseCase(consulta), mockk(), mockk(relaxed = true))
     ).setControllerAdvice(GlobalExceptionHandler()).build()
 
     @Test

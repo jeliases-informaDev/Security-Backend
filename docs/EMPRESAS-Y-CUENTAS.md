@@ -46,4 +46,17 @@ Todos exigen el rol `ADMINISTRADOR`.
 ## A tener en cuenta
 
 - Hoy **todo ADMINISTRADOR ve y administra todas las empresas**. Si más adelante un cliente tiene su propio administrador, habrá que limitarlo a su empresa.
-- `GET /api/usuarios` lo puede llamar cualquier cuenta autenticada y devuelve las cuentas de todas las empresas (nombre, correo, empresa y rol). Conviene restringirlo o filtrarlo por empresa antes de tener varios clientes.
+- `GET /api/usuarios` devuelve todas las cuentas solo a un administrador; a una cuenta común, las de su empresa (ver "Aislamiento").
+
+## Aislamiento: la empresa sale de la cuenta, no del pedido
+
+`AccesoEmpresaService` (módulo de operaciones) decide con qué empresa se trabaja a partir de la **cuenta autenticada** (el token), nunca de lo que mande la web o la app:
+
+| Quién | `empresa=` / `usuario=` en el pedido | Registros por id (`GET`, `PUT`, PDF, `PATCH /usuario`) | Registro nuevo |
+|---|---|---|---|
+| Cuenta común | Se ignoran: siempre su propia empresa y su propia cuenta. Sin empresa → 403 | Solo los de su empresa (la del dueño del registro); uno ajeno responde **404** | Queda a su nombre y en su empresa, aunque el cuerpo diga otra cosa |
+| `ADMINISTRADOR` | Puede indicar cualquier empresa o cuenta; sin indicar, la suya | Todos | Como lo mande (a nombre de la cuenta indicada) |
+
+`GET /api/usuarios` sigue la misma regla: un administrador ve todas las cuentas; una cuenta común, solo las de su empresa. Los clientes no deben saber unos de otros: no hay selector de empresa, iniciar sesión ya identifica a la empresa.
+
+Cómo comprobarlo: con una cuenta común de la empresa A, llamar a la API con datos de la empresa B (`?empresa=B`, el id de un registro de B, `usuarios-por-empresa?empresa=B`, `obtener-usuario?usuario=<cuenta de B>`, crear un registro a nombre de B). Todo debe devolver los datos de A, 404 o 403; nunca los de B.

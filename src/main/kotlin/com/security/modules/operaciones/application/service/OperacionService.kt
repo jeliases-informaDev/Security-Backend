@@ -118,10 +118,12 @@ class OperacionService(
         if (monto.signum() < 0 || monto.precision() > 15) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Monto fuera del rango permitido")
         }
+        // El registro queda en la empresa actual de la cuenta duena (no en el texto que mande el cliente).
+        val empresa = usuario.empresa?.trim()?.takeIf { it.isNotEmpty() } ?: request.registro.empresa
         val guardado = operacionRepository.saveAndFlush(RegistroOperacionesEntity(
             numeroRegistro = request.numeroRegistro.trim(),
             idUsuario = usuario.id,
-            empresa = request.registro.empresa,
+            empresa = empresa,
             oficina = request.registro.oficina,
             fechaRegistro = request.registro.fechaRegistro,
             personaFisica = request.personaFisica.toEntity(),

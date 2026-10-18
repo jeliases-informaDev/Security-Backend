@@ -24,7 +24,7 @@ class ResponsableOperacionTest {
     }
 
     @Test
-    fun `consulta la empresa enviada sin depender de la cuenta autenticada`() {
+    fun `lista los usuarios de la empresa indicada (cual, lo decide el controlador con AccesoEmpresaService)`() {
         every { usuarios.findAllByEmpresaOrderByNombresAscApePatAscIdAsc("Peru Luz S.A.C") } returns
             listOf(usuario(1, "Peru Luz S.A.C"), usuario(2, "Peru Luz S.A.C", activo = false))
         val resultado = service.listarUsuariosPorEmpresa(" Peru Luz S.A.C ")

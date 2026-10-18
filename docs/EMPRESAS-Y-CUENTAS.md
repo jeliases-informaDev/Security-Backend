@@ -57,6 +57,16 @@ Todos exigen el rol `ADMINISTRADOR`.
 | Cuenta común | Se ignoran: siempre su propia empresa y su propia cuenta. Sin empresa → 403 | Solo los de su empresa (la del dueño del registro); uno ajeno responde **404** | Queda a su nombre y en su empresa, aunque el cuerpo diga otra cosa |
 | `ADMINISTRADOR` | Puede indicar cualquier empresa o cuenta; sin indicar, la suya | Todos | Como lo mande (a nombre de la cuenta indicada) |
 
+**Hasta dónde ve cada cuenta** (`VisibilidadEmpresaService`, regla general):
+
+| Rol | Alcance | Búsquedas (historial), scoring, matrices | Denuncias | Operaciones |
+|---|---|---|---|---|
+| Cuenta común (USUARIO, SUPERVISOR) | **Propio** | Solo lo que registró ella misma | SUPERVISOR: solo las asignadas a él | Todo lo de su empresa |
+| `ADMINISTRADOR_EMPRESA` (administrador general de la empresa cliente) | **Empresa** | Todo lo de las cuentas de su empresa | Todas las de su empresa | Todo lo de su empresa |
+| `ADMINISTRADOR` (administrador universal, Sulotec) | **Todo** | Todo | Todas | Todas las empresas |
+
+Lo que está fuera del alcance responde **404**, como si no existiera. Editar sigue siendo solo del dueño (matrices). El rol `ADMINISTRADOR_EMPRESA` lo crea `RolesInicializador` al arrancar si no existe. **Denuncias:** la lista de receptores (`GET /api/denuncias/receptores`) solo muestra los de la propia empresa y una denuncia no puede dirigirse a un receptor de otra empresa (400); la empresa de una denuncia es la de su receptor (o, si no tiene, la de quien la registró). Las listas negativas, PEP y sancionadas son información pública de referencia y siguen siendo comunes.
+
 `GET /api/usuarios` sigue la misma regla: un administrador ve todas las cuentas; una cuenta común, solo las de su empresa. Los clientes no deben saber unos de otros: no hay selector de empresa, iniciar sesión ya identifica a la empresa.
 
 Cómo comprobarlo: con una cuenta común de la empresa A, llamar a la API con datos de la empresa B (`?empresa=B`, el id de un registro de B, `usuarios-por-empresa?empresa=B`, `obtener-usuario?usuario=<cuenta de B>`, crear un registro a nombre de B). Todo debe devolver los datos de A, 404 o 403; nunca los de B.

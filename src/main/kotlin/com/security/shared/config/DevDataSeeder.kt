@@ -77,6 +77,7 @@ class DevDataSeeder(
         // Los 3 roles que existen en las bases reales; el administrador recibe el primero.
         val roles = listOf(
             Triple(ROL_ADMIN, "Administrador", "Acceso total (creado por el seed de desarrollo)"),
+            Triple("ADMINISTRADOR_EMPRESA", "Administrador de empresa", "Ve y gestiona todo lo de su propia empresa (creado por el seed de desarrollo)"),
             Triple("SUPERVISOR", "Supervisor", "Rol de supervision (creado por el seed de desarrollo)"),
             Triple("USUARIO", "Usuario", "Rol basico (creado por el seed de desarrollo)")
         ).map { (codigo, nombre, descripcion) ->

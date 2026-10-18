@@ -328,12 +328,17 @@ class DenunciaController(
     // =========================================================
 
     @GetMapping("/receptores")
-    fun listarReceptores():
-            ResponseEntity<List<ReceptorDenunciaResponse>> {
+    fun listarReceptores(
+        principal: Principal
+    ): ResponseEntity<List<ReceptorDenunciaResponse>> {
 
         val resultado =
             listarReceptoresDenunciaUseCase
-                .ejecutar()
+                .ejecutar(
+                    obtenerUsuarioAutenticado(
+                        principal
+                    )
+                )
 
         return ResponseEntity.ok(
             resultado

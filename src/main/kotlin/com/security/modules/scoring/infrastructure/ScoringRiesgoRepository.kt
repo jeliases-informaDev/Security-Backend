@@ -24,4 +24,33 @@ interface ScoringRiesgoRepository : JpaRepository<ScoringRiesgo, Int> {
         """
     )
     fun buscarPorUsuario(@Param("usuarioId") usuarioId: Int, pageable: Pageable): Page<ScoringRiesgo>
+
+    // Todas las evaluaciones de las cuentas de una empresa (administrador de empresa)
+    @Query(
+        """
+        SELECT sr FROM ScoringRiesgo sr
+        JOIN FETCH sr.entidad e
+        LEFT JOIN FETCH e.personaNatural
+        LEFT JOIN FETCH e.personaJuridica
+        JOIN FETCH sr.ocupacion
+        JOIN FETCH sr.departamento
+        WHERE LOWER(TRIM(sr.usuario.empresa)) = LOWER(TRIM(:empresa))
+        ORDER BY sr.fechaCreacion DESC
+        """
+    )
+    fun buscarPorEmpresa(@Param("empresa") empresa: String, pageable: Pageable): Page<ScoringRiesgo>
+
+    // Todas (administrador universal)
+    @Query(
+        """
+        SELECT sr FROM ScoringRiesgo sr
+        JOIN FETCH sr.entidad e
+        LEFT JOIN FETCH e.personaNatural
+        LEFT JOIN FETCH e.personaJuridica
+        JOIN FETCH sr.ocupacion
+        JOIN FETCH sr.departamento
+        ORDER BY sr.fechaCreacion DESC
+        """
+    )
+    fun buscarTodas(pageable: Pageable): Page<ScoringRiesgo>
 }

@@ -10,6 +10,8 @@ import com.security.modules.scoring.infrastructure.ScoringDepartamentoRepository
 import com.security.modules.scoring.infrastructure.ScoringOcupacionRepository
 import com.security.modules.scoring.infrastructure.ScoringRiesgoRepository
 import com.security.shared.datos.repositories.UsuarioRepository
+import com.security.shared.security.Alcance
+import com.security.shared.security.VisibilidadEmpresaService
 import com.security.shared.exceptions.ResourceNotFoundException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -25,7 +27,8 @@ class ScoringService(
     private val ocupacionRepository: ScoringOcupacionRepository,
     private val departamentoRepository: ScoringDepartamentoRepository,
     private val scoringRiesgoRepository: ScoringRiesgoRepository,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val visibilidad: VisibilidadEmpresaService
 ) {
 
     @Transactional(readOnly = true)
@@ -100,10 +103,15 @@ class ScoringService(
     @Transactional(readOnly = true)
     fun obtenerHistorial(username: String, pageable: Pageable): Page<ScoringResultResponse> {
 
-        val usuario = usuarioRepository.findByUsuario(username)
-            ?: throw ResourceNotFoundException("Usuario no encontrado")
+        // Cada cuenta ve sus evaluaciones; el administrador de empresa, las de su empresa; el universal, todas.
+        val vista = visibilidad.de(username)
+        val pagina = when (vista.alcance) {
+            Alcance.TODO -> scoringRiesgoRepository.buscarTodas(pageable)
+            Alcance.EMPRESA -> scoringRiesgoRepository.buscarPorEmpresa(requireNotNull(vista.empresa), pageable)
+            Alcance.PROPIO -> scoringRiesgoRepository.buscarPorUsuario(vista.usuario.id!!, pageable)
+        }
 
-        return scoringRiesgoRepository.buscarPorUsuario(usuario.id!!, pageable).map { sr ->
+        return pagina.map { sr ->
             ScoringResultResponse(
                 id = sr.id!!,
                 entidadId = sr.entidad.id!!,

@@ -43,7 +43,7 @@ class ScoringServiceTest {
 
     @BeforeEach
     fun setUp() {
-        service = ScoringService(entidadRepository, ocupacionRepository, departamentoRepository, scoringRiesgoRepository, usuarioRepository)
+        service = ScoringService(entidadRepository, ocupacionRepository, departamentoRepository, scoringRiesgoRepository, usuarioRepository, mockk(relaxed = true))
         every { usuarioRepository.findByUsuario("analista") } returns Usuario(id = 1, usuario = "analista", clave = "x", correo = "a@b.c")
         every { scoringRiesgoRepository.save(any<ScoringRiesgo>()) } answers { firstArg<ScoringRiesgo>().also { it.id = 99 } }
     }

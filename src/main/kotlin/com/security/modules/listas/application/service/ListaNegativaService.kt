@@ -8,6 +8,8 @@ import com.security.modules.listas.dto.ResultadoBusquedaResponse
 import com.security.modules.listas.infrastructure.EntidadRepository
 import com.security.modules.listas.infrastructure.HistorialConsultaRepository
 import com.security.shared.datos.repositories.UsuarioRepository
+import com.security.shared.security.Alcance
+import com.security.shared.security.VisibilidadEmpresaService
 import com.security.shared.exceptions.ResourceNotFoundException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -20,7 +22,8 @@ import org.springframework.web.server.ResponseStatusException
 class ListaNegativaService(
     private val entidadRepository: EntidadRepository,
     private val historialConsultaRepository: HistorialConsultaRepository,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val visibilidad: VisibilidadEmpresaService
 ) {
 
     @Transactional
@@ -64,11 +67,15 @@ class ListaNegativaService(
     @Transactional(readOnly = true)
     fun obtenerHistorial(username: String, pageable: Pageable): Page<HistorialConsultaResponse> {
 
-        val usuario = usuarioRepository.findByUsuario(username)
-            ?: throw ResourceNotFoundException("Usuario no encontrado")
+        // Cada cuenta ve sus consultas; el administrador de empresa, las de su empresa; el universal, todas.
+        val vista = visibilidad.de(username)
+        val pagina = when (vista.alcance) {
+            Alcance.TODO -> historialConsultaRepository.buscarTodas(pageable)
+            Alcance.EMPRESA -> historialConsultaRepository.buscarPorEmpresa(requireNotNull(vista.empresa), pageable)
+            Alcance.PROPIO -> historialConsultaRepository.buscarPorUsuario(vista.usuario.id!!, pageable)
+        }
 
-        return historialConsultaRepository
-            .buscarPorUsuario(usuario.id!!, pageable)
+        return pagina
             .map { consulta ->
                 HistorialConsultaResponse(
                     id = consulta.id!!,

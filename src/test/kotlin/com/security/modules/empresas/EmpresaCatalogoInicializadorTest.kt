@@ -14,6 +14,11 @@ class EmpresaCatalogoInicializadorTest {
     private val usuarios = mockk<UsuarioRepository>()
     private val inicializador = EmpresaCatalogoInicializador(empresas, usuarios)
 
+    init {
+        every { empresas.findAll() } returns emptyList()
+        every { empresas.existsBySiglaIgnoreCase(any()) } returns false
+    }
+
     private fun guardadas(): MutableList<Empresa> {
         val lista = mutableListOf<Empresa>()
         every { empresas.save(capture(lista)) } answers { firstArg() }

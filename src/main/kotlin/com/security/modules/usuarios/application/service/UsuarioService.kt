@@ -13,6 +13,7 @@ import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.datos.repositories.UsuarioRolRepository
 import com.security.shared.exceptions.ConflictException
 import com.security.shared.exceptions.ResourceNotFoundException
+import com.security.shared.security.usuarioConSigla
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -43,7 +44,13 @@ class UsuarioService(
     @Transactional
     fun crear(request: UsuarioCreateRequest): UsuarioResponse {
 
-        if (usuarioRepository.existsByUsuario(request.usuario)) {
+        // La empresa se elige de la lista de empresas; se guarda con el nombre exacto de la lista.
+        val empresaElegida = empresaService.resolverEmpresaActiva(request.empresa)
+        val empresa = empresaElegida.nombre
+        // El usuario interno lleva la sigla de la empresa delante (hcyo.jperez): unico entre empresas.
+        val nombreUsuario = empresaElegida.sigla?.let { usuarioConSigla(it, request.usuario) } ?: request.usuario.trim()
+
+        if (usuarioRepository.existsByUsuario(nombreUsuario)) {
             throw ConflictException("El nombre de usuario ya está en uso")
         }
         if (usuarioRepository.existsByCorreo(request.correo)) {
@@ -53,13 +60,10 @@ class UsuarioService(
         val rol = rolesRepository.findByCodigo(request.rolCodigo)
             ?: throw ResourceNotFoundException("El rol '${request.rolCodigo}' no existe")
 
-        // La empresa se elige de la lista de empresas; se guarda con el nombre exacto de la lista.
-        val empresa = empresaService.resolverActiva(request.empresa)
-
         val now = LocalDateTime.now()
 
         val usuario = Usuario(
-            usuario = request.usuario,
+            usuario = nombreUsuario,
             clave = passwordEncoder.encode(request.clave)!!,
             correo = request.correo,
             nombres = request.nombres,

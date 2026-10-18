@@ -23,4 +23,31 @@ interface HistorialConsultaRepository : JpaRepository<HistorialConsulta, Int> {
         """
     )
     fun buscarPorUsuario(@Param("usuarioId") usuarioId: Int, pageable: Pageable): Page<HistorialConsulta>
+
+    // Consultas de todas las cuentas de una empresa (administrador de empresa)
+    @Query(
+        """
+        SELECT hc FROM HistorialConsulta hc
+        JOIN FETCH hc.entidad e
+        LEFT JOIN FETCH e.personaNatural
+        LEFT JOIN FETCH e.personaJuridica
+        LEFT JOIN FETCH e.tipoDocumento
+        WHERE LOWER(TRIM(hc.usuario.empresa)) = LOWER(TRIM(:empresa))
+        ORDER BY hc.fechaConsulta DESC
+        """
+    )
+    fun buscarPorEmpresa(@Param("empresa") empresa: String, pageable: Pageable): Page<HistorialConsulta>
+
+    // Todas (administrador universal)
+    @Query(
+        """
+        SELECT hc FROM HistorialConsulta hc
+        JOIN FETCH hc.entidad e
+        LEFT JOIN FETCH e.personaNatural
+        LEFT JOIN FETCH e.personaJuridica
+        LEFT JOIN FETCH e.tipoDocumento
+        ORDER BY hc.fechaConsulta DESC
+        """
+    )
+    fun buscarTodas(pageable: Pageable): Page<HistorialConsulta>
 }

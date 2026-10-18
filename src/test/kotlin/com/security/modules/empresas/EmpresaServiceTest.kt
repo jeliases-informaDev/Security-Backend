@@ -21,6 +21,10 @@ class EmpresaServiceTest {
     private val usuarios = mockk<UsuarioRepository>()
     private val service = EmpresaService(empresas, usuarios)
 
+    init {
+        every { empresas.existsBySiglaIgnoreCase(any()) } returns false
+    }
+
     private fun empresa(id: Int = 1, nombre: String = "Peru Luz S.A.C", ruc: String? = null, activa: Boolean = true) =
         Empresa(id = id, nombre = nombre, ruc = ruc, activa = activa,
             fechaCreacion = LocalDateTime.now(), fechaActualizacion = LocalDateTime.now())
@@ -54,6 +58,8 @@ class EmpresaServiceTest {
         val respuesta = service.crear(EmpresaCreateRequest(nombre = "  Peru Luz S.A.C  ", ruc = null))
 
         assertEquals("Peru Luz S.A.C", guardada.captured.nombre)
+        assertEquals("PL", guardada.captured.sigla)
+        assertNotNull(guardada.captured.uuid)
         assertTrue(guardada.captured.activa)
         assertNull(guardada.captured.ruc)
         assertEquals(10, respuesta.id)

@@ -3,6 +3,8 @@ package com.security.modules.denuncias.application.usecase
 import com.security.modules.denuncias.application.dto.ReceptorDenunciaResponse
 import com.security.shared.datos.entities.Usuario
 import com.security.shared.datos.repositories.UsuarioRepository
+import com.security.modules.denuncias.application.service.AutorizacionDenunciaService
+import com.security.shared.security.mismaEmpresa
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -10,21 +12,36 @@ import org.springframework.transaction.annotation.Transactional
 class ListarReceptoresDenunciaUseCase(
 
     private val usuarioRepository:
-    UsuarioRepository
+    UsuarioRepository,
+
+    private val autorizacionDenunciaService:
+    AutorizacionDenunciaService
 ) {
 
     @Transactional(readOnly = true)
-    fun ejecutar():
-            List<ReceptorDenunciaResponse> {
+    /**
+     * Receptores que puede elegir quien registra la denuncia: solo los de su propia empresa
+     * (los clientes no deben saber unos de otros). El administrador universal ve a todos.
+     */
+    fun ejecutar(
+        solicitante: Usuario
+    ): List<ReceptorDenunciaResponse> {
 
-        val usuarios =
+        val todos =
             usuarioRepository
                 .findAllActivosByRoles(
                     setOf(
                         "ADMINISTRADOR",
+                        "ADMINISTRADOR_EMPRESA",
                         "SUPERVISOR"
                     )
                 )
+
+        val usuarios =
+            when {
+                autorizacionDenunciaService.esAdministrador(solicitante) -> todos
+                else -> todos.filter { mismaEmpresa(solicitante.empresa, it.empresa) }
+            }
 
         return usuarios
             .map {

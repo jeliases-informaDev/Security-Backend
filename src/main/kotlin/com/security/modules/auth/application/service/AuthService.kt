@@ -24,7 +24,10 @@ class AuthService(
             throw BadCredentialsException("Usuario o contraseña incorrectos")
         }
 
-        val usuario = usuarioRepository.findByUsuario(request.usuario)
+        // Se entra con el usuario o con el correo (el correo es unico entre empresas; el usuario interno lleva la sigla).
+        val identificador = request.usuario.trim()
+        val usuario = usuarioRepository.findByUsuario(identificador)
+            ?: if (identificador.contains('@')) usuarioRepository.findByCorreoConRoles(identificador) else null
 
         // Ejecuta el matches() aunque el usuario no exista, con un hash dummy,
         // para no filtrar por tiempo de respuesta si el usuario existe o no

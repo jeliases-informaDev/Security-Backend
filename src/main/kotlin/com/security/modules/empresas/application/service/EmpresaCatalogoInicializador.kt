@@ -8,6 +8,9 @@ import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
+import com.security.shared.security.siglaLibre
+import com.security.shared.security.siglaSugerida
+import java.util.UUID
 import java.time.LocalDateTime
 
 /**
@@ -54,6 +57,26 @@ class EmpresaCatalogoInicializador(
         if (agregadas > 0) {
             log.info("Lista de empresas: se agregaron {} (las que tenian las cuentas o la de demostracion).", agregadas)
         }
+        completarUuidYSigla()
+    }
+
+    /** A las empresas creadas antes de existir uuid y sigla se les asignan al arrancar (una sola vez). */
+    internal fun completarUuidYSigla() {
+        val asignadas = mutableSetOf<String>()
+        for (empresa in empresaRepository.findAll()) {
+            if (empresa.uuid != null && empresa.sigla != null) continue
+            try {
+                if (empresa.uuid == null) empresa.uuid = UUID.randomUUID().toString()
+                if (empresa.sigla == null) {
+                    empresa.sigla = siglaLibre(siglaSugerida(empresa.nombre)) { it in asignadas || empresaRepository.existsBySiglaIgnoreCase(it) }
+                }
+                asignadas.add(empresa.sigla!!)
+                empresaRepository.save(empresa)
+                log.info("Empresa '{}': sigla {} asignada.", empresa.nombre, empresa.sigla)
+            } catch (e: Exception) {
+                log.warn("No se pudo completar uuid/sigla de la empresa '{}': {}", empresa.nombre, e.message)
+            }
+        }
     }
 
     private fun agregarSiFalta(nombre: String): Boolean {
@@ -62,7 +85,9 @@ class EmpresaCatalogoInicializador(
                 false
             } else {
                 val ahora = LocalDateTime.now()
-                empresaRepository.save(Empresa(nombre = nombre, fechaCreacion = ahora, fechaActualizacion = ahora))
+                val sigla = siglaLibre(siglaSugerida(nombre)) { empresaRepository.existsBySiglaIgnoreCase(it) }
+                empresaRepository.save(Empresa(nombre = nombre, uuid = UUID.randomUUID().toString(), sigla = sigla,
+                    fechaCreacion = ahora, fechaActualizacion = ahora))
                 true
             }
         } catch (e: Exception) {

@@ -48,6 +48,15 @@ Todos exigen el rol `ADMINISTRADOR`.
 - Hoy **todo ADMINISTRADOR ve y administra todas las empresas**. Si más adelante un cliente tiene su propio administrador, habrá que limitarlo a su empresa.
 - `GET /api/usuarios` devuelve todas las cuentas solo a un administrador; a una cuenta común, las de su empresa (ver "Aislamiento").
 
+## Identificadores, carga masiva e invitaciones
+
+- Cada empresa tiene un **UUID** (identificador público, no adivinable) y una **sigla** (2 a 8 letras o números, única; se propone a partir del nombre y se puede indicar al crear). A las empresas anteriores se les asignan al arrancar.
+- El **usuario interno** de cada cuenta lleva la sigla delante: `hcyo.jperez`. Así dos empresas pueden tener un "jperez" sin chocar; en pantalla se ve el nombre de la persona.
+- Se puede **entrar con el correo o con el usuario**: el correo es único entre empresas.
+- **Carga masiva** (`POST /api/usuarios/carga-masiva`, solo ADMINISTRADOR): `{ "empresa": "...", "soloValidar": true|false, "cuentas": [{ "nombres", "apePat", "apeMat"?, "correo", "cargo"?, "rolCodigo" }] }`. Primero se revisa fila por fila (correo válido y no repetido, rol existente); se crea **todo o nada**. El usuario se arma solo (`sigla.parte-local-del-correo`).
+- **Invitaciones:** con correo de salida configurado (`SPRING_MAIL_HOST` y compañía en `plaft.env`; remitente `APP_MAIL_FROM`), cada cuenta nueva recibe un enlace de un solo uso (72 h) a `{WEB_URL}/restablecer-clave?token=...` para elegir su clave; también `POST /api/usuarios/{id}/invitar` para reenviarlo. Sin correo configurado, la carga devuelve una **clave temporal** por cuenta para entregarla a mano y los enlaces quedan en el log.
+- Recuperación: `POST /api/auth/forgot-password` (correo) y `POST /api/auth/reset-password` (token + nueva clave) ya existían; la web ahora tiene las pantallas.
+
 ## Aislamiento: la empresa sale de la cuenta, no del pedido
 
 `AccesoEmpresaService` (módulo de operaciones) decide con qué empresa se trabaja a partir de la **cuenta autenticada** (el token), nunca de lo que mande la web o la app:
@@ -56,6 +65,16 @@ Todos exigen el rol `ADMINISTRADOR`.
 |---|---|---|---|
 | Cuenta común | Se ignoran: siempre su propia empresa y su propia cuenta. Sin empresa → 403 | Solo los de su empresa (la del dueño del registro); uno ajeno responde **404** | Queda a su nombre y en su empresa, aunque el cuerpo diga otra cosa |
 | `ADMINISTRADOR` | Puede indicar cualquier empresa o cuenta; sin indicar, la suya | Todos | Como lo mande (a nombre de la cuenta indicada) |
+
+**Hasta dónde ve cada cuenta** (`VisibilidadEmpresaService`, regla general):
+
+| Rol | Alcance | Búsquedas (historial), scoring, matrices | Denuncias | Operaciones |
+|---|---|---|---|---|
+| Cuenta común (USUARIO, SUPERVISOR) | **Propio** | Solo lo que registró ella misma | SUPERVISOR: solo las asignadas a él | Todo lo de su empresa |
+| `ADMINISTRADOR_EMPRESA` (administrador general de la empresa cliente) | **Empresa** | Todo lo de las cuentas de su empresa | Todas las de su empresa | Todo lo de su empresa |
+| `ADMINISTRADOR` (administrador universal, Sulotec) | **Todo** | Todo | Todas | Todas las empresas |
+
+Lo que está fuera del alcance responde **404**, como si no existiera. Editar sigue siendo solo del dueño (matrices). El rol `ADMINISTRADOR_EMPRESA` lo crea `RolesInicializador` al arrancar si no existe. **Denuncias:** la lista de receptores (`GET /api/denuncias/receptores`) solo muestra los de la propia empresa y una denuncia no puede dirigirse a un receptor de otra empresa (400); la empresa de una denuncia es la de su receptor (o, si no tiene, la de quien la registró). Las listas negativas, PEP y sancionadas son información pública de referencia y siguen siendo comunes.
 
 `GET /api/usuarios` sigue la misma regla: un administrador ve todas las cuentas; una cuenta común, solo las de su empresa. Los clientes no deben saber unos de otros: no hay selector de empresa, iniciar sesión ya identifica a la empresa.
 

@@ -54,6 +54,19 @@ class ListarDenunciasUseCase(
                     estado
                 )
 
+            } else if (
+                autorizacionDenunciaService
+                    .esAdministradorEmpresa(
+                        usuarioResponsable
+                    )
+            ) {
+
+                // ADMINISTRADOR DE EMPRESA: todas las de su empresa
+                obtenerParaEmpresa(
+                    requireNotNull(usuarioResponsable.empresa).trim(),
+                    estado
+                )
+
             } else {
 
                 // =================================================
@@ -98,6 +111,23 @@ class ListarDenunciasUseCase(
 
             denunciaRepository
                 .findAllByOrderByFechaCreacionDesc()
+        }
+    }
+
+
+    // =========================================================
+    // ADMINISTRADOR DE EMPRESA
+    // =========================================================
+
+    private fun obtenerParaEmpresa(
+        empresa: String,
+        estado: EstadoDenuncia?
+    ): List<DenunciaEntity> {
+
+        return if (estado != null) {
+            denunciaRepository.buscarPorEmpresaYEstado(empresa, estado)
+        } else {
+            denunciaRepository.buscarPorEmpresa(empresa)
         }
     }
 

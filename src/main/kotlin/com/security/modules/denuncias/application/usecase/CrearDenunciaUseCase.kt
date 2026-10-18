@@ -11,6 +11,9 @@ import com.security.modules.denuncias.infrastructure.persistence.repository.Denu
 import com.security.modules.denuncias.infrastructure.persistence.repository.DenunciaInvolucradoRepository
 import com.security.modules.denuncias.infrastructure.persistence.repository.DenunciaRepository
 import com.security.shared.datos.entities.Usuario
+import com.security.modules.denuncias.application.service.AutorizacionDenunciaService
+import com.security.shared.security.limpiarEmpresa
+import com.security.shared.security.mismaEmpresa
 import com.security.shared.datos.repositories.UsuarioRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -34,7 +37,10 @@ class CrearDenunciaUseCase(
     UsuarioRepository,
 
     private val seguimientoDenunciaService:
-    SeguimientoDenunciaService
+    SeguimientoDenunciaService,
+
+    private val autorizacionDenunciaService:
+    AutorizacionDenunciaService
 ) {
 
     @Transactional
@@ -53,6 +59,11 @@ class CrearDenunciaUseCase(
             obtenerReceptor(
                 request.receptorUsuarioId
             )
+
+        validarReceptorDeMiEmpresa(
+            receptor,
+            usuarioCreador
+        )
 
         // =====================================================
         // GENERAR DATOS DE SEGUIMIENTO
@@ -459,6 +470,34 @@ class CrearDenunciaUseCase(
     // =========================================================
     // OBTENER RECEPTOR
     // =========================================================
+
+    /**
+     * Una denuncia solo puede dirigirse a un receptor de la propia empresa de quien la registra
+     * (el administrador universal puede elegir a cualquiera). Se comprueba aunque sea anonima.
+     */
+    private fun validarReceptorDeMiEmpresa(
+        receptor: Usuario?,
+        creador: Usuario?
+    ) {
+        if (receptor == null || creador == null) {
+            return
+        }
+        if (autorizacionDenunciaService.esAdministrador(creador)) {
+            return
+        }
+        if (limpiarEmpresa(creador.empresa) == null) {
+            throw ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Tu usuario no tiene una empresa asignada: pídele a un administrador que la configure."
+            )
+        }
+        if (!mismaEmpresa(creador.empresa, receptor.empresa)) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "El receptor seleccionado no pertenece a tu empresa."
+            )
+        }
+    }
 
     private fun obtenerReceptor(
         receptorUsuarioId: Int?

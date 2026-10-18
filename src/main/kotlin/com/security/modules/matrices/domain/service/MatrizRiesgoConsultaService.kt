@@ -6,13 +6,16 @@ import com.security.modules.matrices.infrastructure.persistence.entity.MatrizRie
 import com.security.modules.matrices.infrastructure.persistence.repository.MatrizRiesgoAnalisisRepository
 import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.exceptions.ResourceNotFoundException
+import com.security.shared.security.Alcance
+import com.security.shared.security.VisibilidadEmpresaService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class MatrizRiesgoConsultaService(
     private val usuarioRepository: UsuarioRepository,
-    private val analisisRepository: MatrizRiesgoAnalisisRepository
+    private val analisisRepository: MatrizRiesgoAnalisisRepository,
+    private val visibilidad: VisibilidadEmpresaService
 ) {
 
     @Transactional(readOnly = true)
@@ -20,21 +23,17 @@ class MatrizRiesgoConsultaService(
         username: String
     ): List<MatrizRiesgoResumenResponse> {
 
-        val usuario = usuarioRepository.findByUsuario(username)
-            ?: throw ResourceNotFoundException(
-                "Usuario no encontrado"
+        // Cada cuenta ve sus analisis; el administrador de empresa, los de su empresa; el universal, todos.
+        val vista = visibilidad.de(username)
+        val analisis = when (vista.alcance) {
+            Alcance.TODO -> analisisRepository.findAllByOrderByFechaCreacionDesc()
+            Alcance.EMPRESA -> analisisRepository.buscarPorEmpresa(requireNotNull(vista.empresa))
+            Alcance.PROPIO -> analisisRepository.findAllByUsuario_IdOrderByFechaCreacionDesc(
+                vista.usuario.id ?: throw ResourceNotFoundException("Usuario inválido")
             )
+        }
 
-        val usuarioId = usuario.id
-            ?: throw ResourceNotFoundException(
-                "Usuario inválido"
-            )
-
-        return analisisRepository
-            .findAllByUsuario_IdOrderByFechaCreacionDesc(
-                usuarioId
-            )
-            .map(::toResumen)
+        return analisis.map(::toResumen)
     }
 
     @Transactional(readOnly = true)
@@ -43,24 +42,13 @@ class MatrizRiesgoConsultaService(
         id: Int
     ): MatrizRiesgoDetalleResponse {
 
-        val usuario = usuarioRepository.findByUsuario(username)
+        // Un analisis ajeno (fuera del alcance) responde "no encontrado", como si no existiera.
+        val vista = visibilidad.de(username)
+        val analisis = analisisRepository.findById(id).orElse(null)
+            ?.takeIf { vista.puedeVer(it.usuario) }
             ?: throw ResourceNotFoundException(
-                "Usuario no encontrado"
+                "El análisis de riesgo no fue encontrado"
             )
-
-        val usuarioId = usuario.id
-            ?: throw ResourceNotFoundException(
-                "Usuario inválido"
-            )
-
-        val analisis =
-            analisisRepository.findByIdAndUsuario_Id(
-                id,
-                usuarioId
-            )
-                ?: throw ResourceNotFoundException(
-                    "El análisis de riesgo no fue encontrado"
-                )
 
         return toDetalle(analisis)
     }

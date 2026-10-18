@@ -1,6 +1,10 @@
 package com.security.modules.usuarios.controller.infraestructure
 
+import com.security.modules.usuarios.application.service.CargaMasivaService
 import com.security.modules.usuarios.application.service.UsuarioService
+import com.security.modules.usuarios.dto.CargaMasivaRequest
+import com.security.modules.usuarios.dto.CargaMasivaResponse
+import com.security.modules.usuarios.dto.InvitacionResponse
 import com.security.modules.usuarios.dto.CambiarEmpresaRequest
 import com.security.modules.usuarios.dto.CambiarRolRequest
 import com.security.modules.usuarios.dto.RolResponse
@@ -17,7 +21,8 @@ import com.security.shared.security.esAdministrador
 @RestController
 @RequestMapping("/api/usuarios")
 class UsuarioController(
-    private val usuarioService: UsuarioService
+    private val usuarioService: UsuarioService,
+    private val cargaMasivaService: CargaMasivaService
 ) {
 
     // Un ADMINISTRADOR ve todas las cuentas; cualquier otra cuenta solo las de su propia empresa
@@ -52,6 +57,20 @@ class UsuarioController(
         @Valid @RequestBody request: CambiarEmpresaRequest
     ): ResponseEntity<UsuarioResponse> {
         return ResponseEntity.ok(usuarioService.cambiarEmpresa(id, request))
+    }
+
+    // Alta por lotes para una empresa (soloValidar = true revisa sin crear). Todo o nada.
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PostMapping("/carga-masiva")
+    fun cargaMasiva(@Valid @RequestBody request: CargaMasivaRequest): ResponseEntity<CargaMasivaResponse> {
+        return ResponseEntity.ok(cargaMasivaService.cargar(request))
+    }
+
+    // Manda (o vuelve a mandar) el enlace para que la persona elija su clave.
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PostMapping("/{id}/invitar")
+    fun invitar(@PathVariable id: Int): ResponseEntity<InvitacionResponse> {
+        return ResponseEntity.ok(cargaMasivaService.invitar(id))
     }
 
     @PreAuthorize("hasRole('ADMINISTRADOR')")

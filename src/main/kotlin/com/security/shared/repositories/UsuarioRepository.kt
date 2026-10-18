@@ -50,6 +50,18 @@ interface UsuarioRepository : JpaRepository<Usuario, Int> {
         correo: String
     ): Usuario?
 
+    // Para entrar con el correo (es unico entre empresas); trae los roles como findByUsuario
+    @Query("""
+        SELECT DISTINCT u
+        FROM Usuario u
+        JOIN FETCH u.roles ur
+        JOIN FETCH ur.rol r
+        WHERE LOWER(u.correo) = LOWER(:correo)
+    """)
+    fun findByCorreoConRoles(
+        @Param("correo") correo: String
+    ): Usuario?
+
     fun existsByUsuario(
         usuario: String
     ): Boolean

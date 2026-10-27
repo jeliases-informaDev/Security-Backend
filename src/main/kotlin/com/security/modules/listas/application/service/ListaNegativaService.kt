@@ -12,6 +12,8 @@ import com.security.shared.security.Alcance
 import com.security.shared.security.VisibilidadEmpresaService
 import com.security.shared.exceptions.ResourceNotFoundException
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -26,6 +28,14 @@ class ListaNegativaService(
     private val visibilidad: VisibilidadEmpresaService
 ) {
 
+    companion object {
+        const val TAMANO_PAGINA = 20
+        const val TAMANO_MAXIMO = 50
+        const val CARACTERES_MINIMOS = 3
+    }
+
+    // Busca de a una pagina (la web pide 20; el tope es 50). El total sale de un conteo aparte, que Spring Data no ejecuta
+    // cuando la primera pagina ya trae todo. Al historial solo van las personas que se muestran en esta pagina.
     @Transactional
     fun buscar(
         username: String,
@@ -33,36 +43,64 @@ class ListaNegativaService(
         tipoDocumento: String?,
         nombres: String?,
         apellidoPaterno: String?,
-        apellidoMaterno: String?
-    ): List<ResultadoBusquedaResponse> {
+        apellidoMaterno: String?,
+        pagina: Int = 0,
+        tamano: Int = TAMANO_PAGINA
+    ): Page<ResultadoBusquedaResponse> {
 
-        val criterios = listOf(documento, nombres, apellidoPaterno, apellidoMaterno)
-        if (criterios.all { it.isNullOrBlank() }) {
+        if (pagina < 0 || tamano < 1) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "La página debe ser 0 o mayor y el tamaño, al menos 1"
+            )
+        }
+
+        val documentoLimpio = documento.limpio()
+        val nombresLimpio = nombres.limpio()
+        val paternoLimpio = apellidoPaterno.limpio()
+        val maternoLimpio = apellidoMaterno.limpio()
+        val textos = listOf(nombresLimpio, paternoLimpio, maternoLimpio)
+
+        if (documentoLimpio == null && textos.all { it == null }) {
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
                 "Debe indicar al menos un criterio de búsqueda (documento, nombres o apellidos)"
             )
         }
-
-        val entidades = entidadRepository.buscar(
-            documento = documento?.trim()?.ifBlank { null },
-            tipoDocumento = tipoDocumento?.trim()?.ifBlank { null },
-            nombres = nombres?.trim()?.ifBlank { null },
-            apellidoPaterno = apellidoPaterno?.trim()?.ifBlank { null },
-            apellidoMaterno = apellidoMaterno?.trim()?.ifBlank { null }
-        )
-
-        if (entidades.isNotEmpty()) {
-            val usuario = usuarioRepository.findByUsuario(username)
-            if (usuario != null) {
-                historialConsultaRepository.saveAll(
-                    entidades.map { entidad -> HistorialConsulta(usuario = usuario, entidad = entidad) }
-                )
-            }
+        // Sin documento, un texto de 1 o 2 letras coincide con media base de datos: se pide al menos 3 en algun campo
+        if (documentoLimpio == null && textos.none { it != null && it.count(Char::isLetterOrDigit) >= CARACTERES_MINIMOS }) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Escriba al menos $CARACTERES_MINIMOS letras en el nombre o en algún apellido, o indique el documento"
+            )
         }
 
-        return entidades.map { it.toResponse() }
+        val encontradas = entidadRepository.buscar(
+            documento = documentoLimpio,
+            tipoDocumento = tipoDocumento.limpio(),
+            nombres = nombresLimpio,
+            apellidoPaterno = paternoLimpio,
+            apellidoMaterno = maternoLimpio,
+            pageable = PageRequest.of(pagina, minOf(tamano, TAMANO_MAXIMO))
+        )
+
+        if (encontradas.isEmpty) {
+            return PageImpl(emptyList(), encontradas.pageable, encontradas.totalElements)
+        }
+
+        // Las apariciones en listas de toda la pagina, en una sola consulta (antes era una por persona)
+        val conManchas = entidadRepository.cargarManchas(encontradas.content.mapNotNull { it.id }).associateBy { it.id }
+
+        usuarioRepository.findByUsuario(username)?.let { usuario ->
+            historialConsultaRepository.saveAll(
+                encontradas.content.map { entidad -> HistorialConsulta(usuario = usuario, entidad = entidad) }
+            )
+        }
+
+        return encontradas.map { (conManchas[it.id] ?: it).toResponse() }
     }
+
+    private fun String?.limpio(): String? = this?.trim()?.ifBlank { null }
 
     @Transactional(readOnly = true)
     fun obtenerHistorial(username: String, pageable: Pageable): Page<HistorialConsultaResponse> {

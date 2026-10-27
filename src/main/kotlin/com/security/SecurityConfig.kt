@@ -1,6 +1,7 @@
 package com.security
 
 import com.security.modules.auth.application.service.JwtAuthenticationFilter
+import com.security.shared.config.CabecerasPaginacion
 import com.security.shared.security.RestAccessDeniedHandler
 import com.security.shared.security.RestAuthenticationEntryPoint
 import org.springframework.beans.factory.annotation.Value
@@ -84,6 +85,8 @@ class SecurityConfig(
         allowedOrigins.map { it.trim() }.filter { it.isNotEmpty() }.forEach { config.addAllowedOrigin(it) }
         config.addAllowedHeader("*")
         config.addAllowedMethod("*")
+        // La web lee el total de resultados de las busquedas paginadas en estas cabeceras
+        CabecerasPaginacion.TODAS.forEach { config.addExposedHeader(it) }
 
         source.registerCorsConfiguration("/**", config)
 

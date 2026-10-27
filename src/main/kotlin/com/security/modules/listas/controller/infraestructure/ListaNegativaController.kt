@@ -3,6 +3,7 @@ package com.security.modules.listas.controller.infraestructure
 import com.security.modules.listas.application.service.ListaNegativaService
 import com.security.modules.listas.dto.HistorialConsultaResponse
 import com.security.modules.listas.dto.ResultadoBusquedaResponse
+import com.security.shared.config.CabecerasPaginacion
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.http.ResponseEntity
@@ -19,6 +20,7 @@ class ListaNegativaController(
     private val listaNegativaService: ListaNegativaService
 ) {
 
+    // page empieza en 0. El cuerpo sigue siendo la lista de la pagina (como antes); el total va en cabeceras.
     @GetMapping("/buscar")
     fun buscar(
         authentication: Authentication,
@@ -26,7 +28,9 @@ class ListaNegativaController(
         @RequestParam(required = false) tipoDocumento: String?,
         @RequestParam(required = false) nombres: String?,
         @RequestParam(required = false) apellidoPaterno: String?,
-        @RequestParam(required = false) apellidoMaterno: String?
+        @RequestParam(required = false) apellidoMaterno: String?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
     ): ResponseEntity<List<ResultadoBusquedaResponse>> {
 
         val resultados = listaNegativaService.buscar(
@@ -35,10 +39,17 @@ class ListaNegativaController(
             tipoDocumento = tipoDocumento,
             nombres = nombres,
             apellidoPaterno = apellidoPaterno,
-            apellidoMaterno = apellidoMaterno
+            apellidoMaterno = apellidoMaterno,
+            pagina = page,
+            tamano = size
         )
 
-        return ResponseEntity.ok(resultados)
+        return ResponseEntity.ok()
+            .header(CabecerasPaginacion.TOTAL, resultados.totalElements.toString())
+            .header(CabecerasPaginacion.TOTAL_PAGINAS, resultados.totalPages.toString())
+            .header(CabecerasPaginacion.PAGINA, resultados.number.toString())
+            .header(CabecerasPaginacion.TAMANO, resultados.size.toString())
+            .body(resultados.content)
     }
 
     @GetMapping("/historial")

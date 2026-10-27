@@ -63,7 +63,7 @@ Luego abre [consultas.sql](consultas.sql) y ejecuta una consulta a la vez.
 | `tipo_documento` | DNI, RUC, CE, PASAPORTE. |
 | `pais` | Países. |
 
-**Cómo se busca una persona:** la web llama a `GET /api/listas-negativas/buscar` → el backend filtra `entidades` por documento exacto y/o nombre/apellidos (`LIKE`) → registra la búsqueda en `historial_consultas`.
+**Cómo se busca una persona:** la web llama a `GET /api/listas-negativas/buscar` → el backend filtra `entidades` por documento exacto y/o nombre/apellidos (`LIKE`: el texto puede ir en cualquier parte; sin documento se piden al menos 3 letras en algún campo) → responde **de a una página** ordenada por apellidos (`page` desde 0, `size` por defecto 20 y tope 50; el total va en las cabeceras `X-Total-Count`, `X-Total-Pages`, `X-Page` y `X-Page-Size`, que CORS expone) → registra en `historial_consultas` solo a las personas de esa página. La búsqueda por documento usa el índice `idx_entidades_documento` (`documento`, `id_tipo_documento`), el mismo que crea `deploy/cargar-listas.sh` de Sulotec-infra.
 
 **Dónde están los políticos aquí:** son las entidades cuya lista es *Personas Expuestas Politicamente* (consulta 3 de `consultas.sql`), con su `cargo` e `institucion`. Se filtra por el nombre de la lista porque la columna `tipo_lista.es_pep` no está cargada en todas las bases.
 

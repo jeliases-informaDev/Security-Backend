@@ -6,7 +6,12 @@ import jakarta.persistence.*
 import java.time.LocalDate
 
 @Entity
-@Table(name = "entidades")
+// El indice por documento tiene el mismo nombre y columnas que el que crea deploy/cargar-listas.sh (Sulotec-infra):
+// asi Hibernate, al actualizar el esquema, lo reconoce y no crea uno repetido.
+@Table(
+    name = "entidades",
+    indexes = [Index(name = "idx_entidades_documento", columnList = "documento,id_tipo_documento")]
+)
 class Entidad(
 
     @Id

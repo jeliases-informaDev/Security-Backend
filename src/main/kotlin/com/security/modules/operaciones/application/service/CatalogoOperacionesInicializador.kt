@@ -1,0 +1,106 @@
+package com.security.modules.operaciones.application.service
+
+import com.security.modules.operaciones.domain.Moneda
+import com.security.modules.operaciones.domain.Provincia
+import com.security.modules.operaciones.infraestructure.MonedaRepository
+import com.security.modules.operaciones.infraestructure.ProvinciaRepository
+import com.security.modules.scoring.infrastructure.ScoringDepartamentoRepository
+import org.slf4j.LoggerFactory
+import org.springframework.boot.ApplicationArguments
+import org.springframework.boot.ApplicationRunner
+import org.springframework.core.annotation.Order
+import org.springframework.core.io.ClassPathResource
+import org.springframework.stereotype.Component
+
+/**
+ * Al arrancar, deja llenos los combos "Moneda" y "Provincia" del Registro de Operaciones. Una base nueva
+ * trae las tablas `monedas` y `provincia` vacias y, sin filas, los combos salen sin opciones.
+ *
+ * Agrega solo lo que falta (monedas por codigo, provincias por departamento y nombre): no cambia ni borra
+ * nada de lo que ya hay. Se ejecuta siempre, sin depender de app.seed, y va despues de los catalogos de
+ * scoring porque las provincias cuelgan de los departamentos. Un fallo se registra y no impide que la
+ * API arranque. Las provincias salen de operaciones/provincias.csv (196 del Peru, sin tildes como el
+ * resto de los catalogos); un departamento que no exista en la base se omite con aviso.
+ */
+@Component
+@Order(3)
+class CatalogoOperacionesInicializador(
+    private val monedaRepository: MonedaRepository,
+    private val provinciaRepository: ProvinciaRepository,
+    private val departamentoRepository: ScoringDepartamentoRepository
+) : ApplicationRunner {
+
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    override fun run(args: ApplicationArguments) {
+        try {
+            sembrarMonedas()
+            sembrarProvincias(leerProvincias())
+        } catch (e: Exception) {
+            log.warn("No se pudieron preparar las monedas y provincias de Operaciones: {}", e.message)
+        }
+    }
+
+    internal fun sembrarMonedas(): Int {
+        val existentes = monedaRepository.findAll().mapNotNull { it.codigo?.trim()?.uppercase() }.toSet()
+        val nuevas = MONEDAS.filter { it.codigo !in existentes }
+            .map { Moneda(codigo = it.codigo, nombre = it.nombre, simbolo = it.simbolo) }
+        if (nuevas.isNotEmpty()) {
+            monedaRepository.saveAll(nuevas)
+            log.info("Operaciones: monedas agregadas={}", nuevas.size)
+        }
+        return nuevas.size
+    }
+
+    internal fun sembrarProvincias(filas: List<Pair<String, String>>): Int {
+        val departamentos = departamentoRepository.findAll().associateBy { clave(it.nombre) }
+        val existentes = provinciaRepository.findAll()
+            .map { clave(it.departamento.nombre) to clave(it.nombre) }.toMutableSet()
+        val sinDepartamento = mutableSetOf<String>()
+        val nuevas = mutableListOf<Provincia>()
+        for ((nombreDepartamento, nombre) in filas) {
+            val departamento = departamentos[clave(nombreDepartamento)]
+            if (departamento == null) {
+                sinDepartamento.add(nombreDepartamento)
+                continue
+            }
+            if (existentes.add(clave(nombreDepartamento) to clave(nombre))) {
+                nuevas.add(Provincia(nombre = nombre, departamento = departamento))
+            }
+        }
+        if (sinDepartamento.isNotEmpty()) {
+            log.warn("Operaciones: sin provincias para los departamentos que no existen en la base: {}", sinDepartamento)
+        }
+        if (nuevas.isNotEmpty()) {
+            provinciaRepository.saveAll(nuevas)
+            log.info("Operaciones: provincias agregadas={}", nuevas.size)
+        }
+        return nuevas.size
+    }
+
+    /** Lee "departamento;provincia" (con encabezado) desde el classpath. */
+    internal fun leerProvincias(): List<Pair<String, String>> =
+        ClassPathResource(RUTA_PROVINCIAS).inputStream.bufferedReader(Charsets.UTF_8).useLines { lineas ->
+            lineas.drop(1)
+                .filter { it.isNotBlank() }
+                .map { linea ->
+                    val (departamento, provincia) = linea.split(";")
+                    departamento.trim() to provincia.trim()
+                }
+                .toList()
+        }
+
+    private fun clave(texto: String) = texto.trim().lowercase()
+
+    internal data class MonedaBase(val codigo: String, val nombre: String, val simbolo: String)
+
+    companion object {
+        const val RUTA_PROVINCIAS = "operaciones/provincias.csv"
+
+        internal val MONEDAS = listOf(
+            MonedaBase("PEN", "Soles", "S/"),
+            MonedaBase("USD", "Dolares americanos", "$"),
+            MonedaBase("EUR", "Euros", "€")
+        )
+    }
+}

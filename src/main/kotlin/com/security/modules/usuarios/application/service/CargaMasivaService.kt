@@ -1,4 +1,4 @@
-package com.security.modules.usuarios.application.service
+﻿package com.security.modules.usuarios.application.service
 
 import com.security.modules.auth.application.service.NotificationService
 import com.security.modules.auth.application.service.PasswordResetService
@@ -23,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.security.SecureRandom
 import java.time.LocalDateTime
+import com.security.modules.creditos.application.service.CreditoService
+
+
 
 /**
  * Alta de cuentas por lotes (desde un Excel o CSV) para una empresa, e invitaciones por correo.
@@ -34,7 +37,9 @@ import java.time.LocalDateTime
  *   clave temporal para entregarla a mano.
  */
 @Service
+
 class CargaMasivaService(
+    private val creditoService: CreditoService,
     private val usuarioRepository: UsuarioRepository,
     private val rolesRepository: RolesRepository,
     private val usuarioRolRepository: UsuarioRolRepository,
@@ -52,6 +57,8 @@ class CargaMasivaService(
     @Transactional
     fun cargar(request: CargaMasivaRequest): CargaMasivaResponse {
         val empresa = empresaService.resolverEmpresaActiva(request.empresa)
+        // BPMN P2: Validar cupo de usuarios activos permitidos en la empresa
+        empresa.id?.let { creditoService.validarCupoUsuarios(it) }
         val sigla = empresa.sigla
             ?: throw ResponseStatusException(HttpStatus.CONFLICT, "La empresa ${empresa.nombre} no tiene sigla; vuelve a desplegar o corrígela en Empresas")
         val roles = rolesRepository.findAll().filter { it.activo }.associateBy { it.codigo.trim().uppercase() }

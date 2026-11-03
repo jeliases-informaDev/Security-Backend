@@ -1,4 +1,4 @@
-package com.security.shared.exceptions
+﻿package com.security.shared.exceptions
 
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
@@ -170,6 +170,48 @@ class GlobalExceptionHandler {
         return buildResponse(
             status = HttpStatus.NOT_FOUND,
             message = ex.message ?: "Recurso no encontrado",
+            request = request
+        )
+    }
+
+    // 402 - Saldo insuficiente de creditos/tokens (P3)
+    @ExceptionHandler(com.security.modules.creditos.domain.exceptions.SaldoInsuficienteException::class)
+    fun handleSaldoInsuficiente(
+        ex: com.security.modules.creditos.domain.exceptions.SaldoInsuficienteException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.PAYMENT_REQUIRED,
+            message = ex.message ?: "Saldo insuficiente de créditos",
+            request = request
+        )
+    }
+
+    // 403 - Licencia en solo lectura o suspendida (P4)
+    @ExceptionHandler(com.security.modules.creditos.domain.exceptions.LicenciaVencidaException::class)
+    fun handleLicenciaVencida(
+        ex: com.security.modules.creditos.domain.exceptions.LicenciaVencidaException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.FORBIDDEN,
+            message = ex.message ?: "Licencia no vigente",
+            request = request
+        )
+    }
+
+    // 409 - Cupo maximo de usuarios alcanzado (P2)
+    @ExceptionHandler(com.security.modules.creditos.domain.exceptions.CupoUsuariosExcedidoException::class)
+    fun handleCupoUsuariosExcedido(
+        ex: com.security.modules.creditos.domain.exceptions.CupoUsuariosExcedidoException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.CONFLICT,
+            message = ex.message ?: "Cupo de usuarios excedido",
             request = request
         )
     }

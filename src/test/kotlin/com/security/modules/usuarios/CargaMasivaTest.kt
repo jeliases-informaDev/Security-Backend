@@ -1,4 +1,4 @@
-package com.security.modules.usuarios
+﻿package com.security.modules.usuarios
 
 import com.security.modules.auth.application.service.NotificationService
 import com.security.modules.auth.application.service.PasswordResetService
@@ -30,7 +30,7 @@ class CargaMasivaTest {
     private val empresaService = mockk<EmpresaService>()
     private val reset = mockk<PasswordResetService>()
     private val correo = mockk<NotificationService>()
-    private val service = CargaMasivaService(usuarios, roles, usuarioRoles, encoder, empresaService, reset, correo)
+    private val service = CargaMasivaService(mockk(relaxed = true), usuarios, roles, usuarioRoles, encoder, empresaService, reset, correo)
 
     private val ahora = LocalDateTime.now()
     private fun rol(codigo: String) = Roles(id = 1, codigo = codigo, nombre = codigo, activo = true, fechaCreacion = ahora, fechaActualizacion = ahora)

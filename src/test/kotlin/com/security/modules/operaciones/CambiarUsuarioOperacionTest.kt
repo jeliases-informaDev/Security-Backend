@@ -1,4 +1,4 @@
-package com.security.modules.operaciones
+﻿package com.security.modules.operaciones
 
 import com.security.modules.operaciones.application.service.AccesoEmpresaService
 import com.security.modules.operaciones.application.service.OperacionService
@@ -17,7 +17,7 @@ import kotlin.test.*
 class CambiarUsuarioOperacionTest {
     private val operaciones = mockk<OperacionRepository>()
     private val usuarios = mockk<UsuarioRepository>()
-    private val service = OperacionService(operaciones, usuarios)
+    private val service = OperacionService(mockk(relaxed = true), operaciones, usuarios)
     private val acceso = mockk<AccesoEmpresaService>(relaxed = true)
     private fun usuario(id: Int, empresa: String? = "Peru Luz S.A.C", activo: Boolean = true) =
         Usuario(id = id, usuario = "usuario$id", clave = "test", correo = "$id@example.test",

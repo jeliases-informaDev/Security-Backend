@@ -1,4 +1,4 @@
-package com.security.modules.matrices.infrastructure.controller
+﻿package com.security.modules.matrices.infrastructure.controller
 
 import com.security.modules.matrices.application.service.MatrizRiesgoConsultaService
 import com.security.modules.matrices.infrastructure.export.MatrizRiesgoPdfService
@@ -11,10 +11,19 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.security.Principal
+import com.security.modules.creditos.application.service.CreditoService
+import com.security.modules.creditos.domain.AccionCredito
+import com.security.shared.datos.repositories.UsuarioRepository
+import com.security.shared.exceptions.ResourceNotFoundException
+
+
 
 @RestController
 @RequestMapping("/api/matrices/analisis")
+
 class MatrizRiesgoPdfController(
+    private val creditoService: CreditoService,
+    private val usuarioRepository: UsuarioRepository,
     private val matrizRiesgoConsultaService: MatrizRiesgoConsultaService,
     private val matrizRiesgoPdfService: MatrizRiesgoPdfService
 ) {
@@ -27,6 +36,10 @@ class MatrizRiesgoPdfController(
         principal: Principal,
         @PathVariable id: Int
     ): ResponseEntity<ByteArray> {
+
+        val usuario = usuarioRepository.findByUsuario(principal.name)
+            ?: throw ResourceNotFoundException("Usuario no encontrado")
+        creditoService.consumir(usuario, AccionCredito.MATRIZ_PDF, "matriz:pdf:$id")
 
         val analisis =
             matrizRiesgoConsultaService.obtenerDetalle(

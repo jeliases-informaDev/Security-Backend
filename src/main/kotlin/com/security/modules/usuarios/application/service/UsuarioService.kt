@@ -1,4 +1,4 @@
-package com.security.modules.usuarios.application.service
+﻿package com.security.modules.usuarios.application.service
 
 import com.security.modules.empresas.application.service.EmpresaService
 import com.security.modules.usuarios.dto.CambiarEmpresaRequest
@@ -18,9 +18,14 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import com.security.modules.creditos.application.service.CreditoService
+
+
 
 @Service
+
 class UsuarioService(
+    private val creditoService: CreditoService,
     private val usuarioRepository: UsuarioRepository,
     private val rolesRepository: RolesRepository,
     private val usuarioRolRepository: UsuarioRolRepository,
@@ -47,6 +52,8 @@ class UsuarioService(
         // La empresa se elige de la lista de empresas; se guarda con el nombre exacto de la lista.
         val empresaElegida = empresaService.resolverEmpresaActiva(request.empresa)
         val empresa = empresaElegida.nombre
+        // BPMN P2: Validar cupo de usuarios activos permitidos en la empresa
+        empresaElegida.id?.let { creditoService.validarCupoUsuarios(it) }
         // El usuario interno lleva la sigla de la empresa delante (hcyo.jperez): unico entre empresas.
         val nombreUsuario = empresaElegida.sigla?.let { usuarioConSigla(it, request.usuario) } ?: request.usuario.trim()
 

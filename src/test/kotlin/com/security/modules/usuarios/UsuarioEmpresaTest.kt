@@ -1,4 +1,4 @@
-package com.security.modules.usuarios
+﻿package com.security.modules.usuarios
 
 import com.security.modules.empresas.application.service.EmpresaService
 import com.security.modules.usuarios.application.service.UsuarioService
@@ -26,7 +26,7 @@ class UsuarioEmpresaTest {
     private val usuarioRoles = mockk<UsuarioRolRepository>()
     private val encoder = mockk<PasswordEncoder>()
     private val empresaService = mockk<EmpresaService>()
-    private val service = UsuarioService(usuarios, roles, usuarioRoles, encoder, empresaService)
+    private val service = UsuarioService(mockk(relaxed = true), usuarios, roles, usuarioRoles, encoder, empresaService)
 
     private fun rol(codigo: String = "USUARIO", nombre: String = "Usuario", activo: Boolean = true) =
         Roles(id = 3, codigo = codigo, nombre = nombre, activo = activo,

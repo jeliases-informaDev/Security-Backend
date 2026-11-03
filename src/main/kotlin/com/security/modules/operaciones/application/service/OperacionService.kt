@@ -1,6 +1,6 @@
-package com.security.modules.operaciones.application.service
-import com.security.modules.operaciones.dto.RegistrarOperacionResponse
+﻿package com.security.modules.operaciones.application.service
 
+import com.security.modules.operaciones.dto.RegistrarOperacionResponse
 import com.security.modules.operaciones.dto.ListarOperacionesResponse
 import com.security.modules.operaciones.dto.MostrarUsuarioResponse
 import com.security.modules.operaciones.dto.OperacionItemDto
@@ -17,9 +17,15 @@ import com.tuempresa.operaciones.dto.RegistrarOperacionRequest
 import com.tuempresa.operaciones.dto.PersonaDto
 import com.security.modules.operaciones.dto.*
 import com.security.shared.datos.entities.Usuario
+import com.security.modules.creditos.application.service.CreditoService
+import com.security.modules.creditos.domain.AccionCredito
+
+
 
 @Service
+
 class OperacionService(
+    private val creditoService: CreditoService,
     private val operacionRepository: OperacionRepository,
     private val usuarioRepository: UsuarioRepository
 ) {
@@ -120,6 +126,7 @@ class OperacionService(
         }
         // El registro queda en la empresa actual de la cuenta duena (no en el texto que mande el cliente).
         val empresa = usuario.empresa?.trim()?.takeIf { it.isNotEmpty() } ?: request.registro.empresa
+        usuarioRepository.findById(usuario.id).ifPresent { u -> creditoService.consumir(u, AccionCredito.OPERACION_REGISTRAR, "operacion:${request.numeroRegistro.trim()}") }
         val guardado = operacionRepository.saveAndFlush(RegistroOperacionesEntity(
             numeroRegistro = request.numeroRegistro.trim(),
             idUsuario = usuario.id,

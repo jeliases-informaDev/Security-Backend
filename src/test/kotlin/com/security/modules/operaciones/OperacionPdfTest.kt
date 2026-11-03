@@ -1,4 +1,4 @@
-package com.security.modules.operaciones
+﻿package com.security.modules.operaciones
 
 import com.security.modules.operaciones.application.usecase.ExportarOperacionPdfUseCase
 import com.security.modules.operaciones.application.service.AccesoEmpresaService
@@ -27,7 +27,7 @@ import kotlin.test.*
 
 class OperacionPdfTest {
     private val repository = mockk<OperacionRepository>()
-    private val controller = OperacionPdfController(ExportarOperacionPdfUseCase(
+    private val controller = OperacionPdfController(mockk(relaxed = true), mockk(relaxed = true), ExportarOperacionPdfUseCase(
         OperacionConsultaAdapter(repository, mockk()), PdfBoxGeneradorPdfAdapter()
     ), mockk(relaxed = true))
     private val mvc = MockMvcBuilders.standaloneSetup(controller).build()
@@ -97,7 +97,7 @@ class OperacionPdfTest {
         val acceso = mockk<AccesoEmpresaService>()
         every { acceso.comprobarRegistro(42L) } throws ResourceNotFoundException("No existe un registro de operación con ID 42")
         val ajeno = MockMvcBuilders.standaloneSetup(OperacionPdfController(
-            ExportarOperacionPdfUseCase(OperacionConsultaAdapter(repository, mockk()), PdfBoxGeneradorPdfAdapter()), acceso
+            mockk(relaxed = true), mockk(relaxed = true), ExportarOperacionPdfUseCase(OperacionConsultaAdapter(repository, mockk()), PdfBoxGeneradorPdfAdapter()), acceso
         )).build()
         val respuesta = ajeno.perform(get("/api/operaciones/42/exportar-pdf").accept(MediaType.APPLICATION_PDF)).andReturn().response
         assertEquals(404, respuesta.status)

@@ -1,4 +1,4 @@
-package com.security.modules.listas
+﻿package com.security.modules.listas
 
 import com.security.SecurityConfig
 import com.security.modules.listas.application.service.ListaNegativaService
@@ -30,7 +30,7 @@ class BusquedaPaginadaTest {
     private val entidades = mockk<EntidadRepository>()
     private val historial = mockk<HistorialConsultaRepository>()
     private val usuarios = mockk<UsuarioRepository>()
-    private val service = ListaNegativaService(entidades, historial, usuarios, mockk())
+    private val service = ListaNegativaService(mockk(relaxed = true), entidades, historial, usuarios, mockk())
     private val controller = ListaNegativaController(service)
     private val autenticacion = mockk<Authentication>()
     private val primeraPagina = PageRequest.of(0, 20)

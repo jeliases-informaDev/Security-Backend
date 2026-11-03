@@ -1,4 +1,4 @@
-package com.security.modules.usuarios.controller.infraestructure
+﻿package com.security.modules.usuarios.controller.infraestructure
 
 import com.security.modules.usuarios.application.service.CargaMasivaService
 import com.security.modules.usuarios.application.service.UsuarioService
@@ -17,10 +17,16 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import com.security.shared.security.esAdministrador
+import com.security.shared.security.VisibilidadEmpresaService
+import org.springframework.web.server.ResponseStatusException
+
+
 
 @RestController
 @RequestMapping("/api/usuarios")
+
 class UsuarioController(
+    private val visibilidadService: VisibilidadEmpresaService,
     private val usuarioService: UsuarioService,
     private val cargaMasivaService: CargaMasivaService
 ) {
@@ -34,10 +40,20 @@ class UsuarioController(
         return ResponseEntity.ok(cuentas)
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA')")
     @PostMapping
-    fun crear(@Valid @RequestBody request: UsuarioCreateRequest): ResponseEntity<UsuarioResponse> {
-        val creado = usuarioService.crear(request)
+    fun crear(@Valid @RequestBody request: UsuarioCreateRequest, authentication: Authentication): ResponseEntity<UsuarioResponse> {
+        val requestAjustado = if (authentication.esAdministrador()) {
+            request
+        } else {
+            val vista = visibilidadService.de(authentication.name)
+            val miEmpresa = vista.empresa ?: throw ResponseStatusException(HttpStatus.FORBIDDEN, "Usuario sin empresa asignada")
+            if (request.rolCodigo.trim().uppercase() == "ADMINISTRADOR") {
+                throw ResponseStatusException(HttpStatus.FORBIDDEN, "No puede crear usuarios con rol ADMINISTRADOR universal")
+            }
+            request.copy(empresa = miEmpresa)
+        }
+        val creado = usuarioService.crear(requestAjustado)
         return ResponseEntity.status(HttpStatus.CREATED).body(creado)
     }
 
@@ -67,19 +83,24 @@ class UsuarioController(
     }
 
     // Manda (o vuelve a mandar) el enlace para que la persona elija su clave.
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA')")
     @PostMapping("/{id}/invitar")
     fun invitar(@PathVariable id: Int): ResponseEntity<InvitacionResponse> {
         return ResponseEntity.ok(cargaMasivaService.invitar(id))
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA')")
     @GetMapping("/roles")
-    fun listarRoles(): ResponseEntity<List<RolResponse>> {
-        return ResponseEntity.ok(usuarioService.listarRoles())
+    fun listarRoles(authentication: Authentication): ResponseEntity<List<RolResponse>> {
+        val roles = usuarioService.listarRoles()
+        return if (authentication.esAdministrador()) {
+            ResponseEntity.ok(roles)
+        } else {
+            ResponseEntity.ok(roles.filter { it.codigo != "ADMINISTRADOR" })
+        }
     }
 
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA')")
     @PatchMapping("/{id}/estado")
     fun cambiarEstado(
         @PathVariable id: Int,

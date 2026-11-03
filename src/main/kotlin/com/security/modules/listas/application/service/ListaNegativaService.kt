@@ -1,4 +1,4 @@
-package com.security.modules.listas.application.service
+﻿package com.security.modules.listas.application.service
 
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.domain.HistorialConsulta
@@ -19,9 +19,15 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import com.security.modules.creditos.application.service.CreditoService
+import com.security.modules.creditos.domain.AccionCredito
+
+
 
 @Service
+
 class ListaNegativaService(
+    private val creditoService: CreditoService,
     private val entidadRepository: EntidadRepository,
     private val historialConsultaRepository: HistorialConsultaRepository,
     private val usuarioRepository: UsuarioRepository,
@@ -73,6 +79,13 @@ class ListaNegativaService(
                 HttpStatus.BAD_REQUEST,
                 "Escriba al menos $CARACTERES_MINIMOS letras en el nombre o en algún apellido, o indique el documento"
             )
+        }
+
+        // Cobro de creditos (solo en la primera pagina de la busqueda, page = 0)
+        if (pagina == 0) {
+            val usuarioActual = usuarioRepository.findByUsuario(username)
+                ?: throw ResourceNotFoundException("Usuario no encontrado")
+            creditoService.consumir(usuarioActual, AccionCredito.LISTA_BUSQUEDA, "buscar:doc=$documentoLimpio,nom=$nombresLimpio")
         }
 
         val encontradas = entidadRepository.buscar(

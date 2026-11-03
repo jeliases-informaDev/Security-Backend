@@ -1,4 +1,4 @@
-package com.security.modules.denuncias
+﻿package com.security.modules.denuncias
 
 import com.security.modules.denuncias.application.dto.CrearDenunciaRequest
 import com.security.modules.denuncias.application.service.AutorizacionDenunciaService
@@ -67,7 +67,7 @@ class DenunciasEmpresaTest {
         // el resto de validaciones del pedido deben pasar para llegar a la comprobacion de empresa
         every { request.aceptaTerminos } returns true
         every { request.involucrados } returns listOf(mockk(relaxed = true))
-        val caso = CrearDenunciaUseCase(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), usuarios, mockk(relaxed = true), autorizacion)
+        val caso = CrearDenunciaUseCase(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), usuarios, mockk(relaxed = true), autorizacion)
         return caso to request
     }
 

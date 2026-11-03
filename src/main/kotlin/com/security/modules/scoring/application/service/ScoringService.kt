@@ -1,4 +1,4 @@
-package com.security.modules.scoring.application.service
+﻿package com.security.modules.scoring.application.service
 
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.infrastructure.EntidadRepository
@@ -20,9 +20,15 @@ import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.Normalizer
+import com.security.modules.creditos.application.service.CreditoService
+import com.security.modules.creditos.domain.AccionCredito
+
+
 
 @Service
+
 class ScoringService(
+    private val creditoService: CreditoService,
     private val entidadRepository: EntidadRepository,
     private val ocupacionRepository: ScoringOcupacionRepository,
     private val departamentoRepository: ScoringDepartamentoRepository,
@@ -44,6 +50,7 @@ class ScoringService(
 
         val usuario = usuarioRepository.findByUsuario(username)
             ?: throw ResourceNotFoundException("Usuario no encontrado")
+        creditoService.consumir(usuario, AccionCredito.SCORING_EVALUAR, "scoring:entidadId=${request.entidadId}")
 
         val entidad = entidadRepository.buscarPorIdConDetalle(request.entidadId)
             ?: throw ResourceNotFoundException("No se encontró la entidad a evaluar")

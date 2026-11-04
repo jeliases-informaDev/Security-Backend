@@ -7,6 +7,7 @@ package com.security.modules.creditos.domain
  */
 enum class AccionCredito(val costoInicial: Int, val descripcion: String) {
     LISTA_BUSQUEDA(1, "Búsqueda en listas negativas"),
+    LISTA_PDF(1, "Exportar PDF de reporte de listas negativas"),
     SCORING_EVALUAR(2, "Evaluación de scoring"),
     MATRIZ_REGISTRAR(3, "Registro de un análisis de matriz de riesgo"),
     MATRIZ_PDF(1, "Exportar PDF de una matriz de riesgo"),

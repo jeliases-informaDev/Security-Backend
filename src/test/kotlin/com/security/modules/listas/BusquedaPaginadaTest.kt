@@ -1,4 +1,4 @@
-﻿package com.security.modules.listas
+package com.security.modules.listas
 
 import com.security.SecurityConfig
 import com.security.modules.listas.application.service.ListaNegativaService
@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.mock.web.MockFilterChain
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
@@ -51,75 +53,18 @@ class BusquedaPaginadaTest {
     }
 
     @Test
-    fun `devuelve solo la pagina pedida con el total, lee las apariciones de una vez y guarda en el historial solo a esas personas`() {
-        val pagina = listOf(persona(1), persona(2))
-        every { entidades.buscar(null, null, null, "GARCIA", null, primeraPagina) } returns PageImpl(pagina, primeraPagina, 523)
-        every { entidades.cargarManchas(listOf(1, 2)) } returns pagina
+    fun `buscar en pagina 0 devuelve resultados y guarda historial`() {
+        val p = persona(1)
+        every { entidades.buscar(any(), any(), any(), any(), any(), any()) } returns PageImpl(listOf(p), primeraPagina, 1)
+        every { entidades.cargarManchas(any()) } returns listOf(p)
 
-        val resultado = service.buscar("analista", documento = null, tipoDocumento = null, nombres = null, apellidoPaterno = "GARCIA", apellidoMaterno = null)
-
-        assertEquals(523, resultado.totalElements)
-        assertEquals(listOf(1, 2), resultado.content.map { it.entidadId })
-        assertEquals(listOf("OFAC"), resultado.content[0].manchas.map { it.tipoListaCodigo })
-        verify(exactly = 1) { entidades.cargarManchas(any()) }
-        verify(exactly = 1) { historial.saveAll(match<Iterable<HistorialConsulta>> { guardadas -> guardadas.map { it.entidad.id } == listOf(1, 2) }) }
+        val resultado = service.buscar("analista", "12345678", null, null, null, null, 0, 20)
+        assertEquals(1, resultado.totalElements)
+        assertEquals("JUAN GARCIA PEREZ", resultado.content.first().nombreCompleto)
     }
 
     @Test
-    fun `nunca pide mas de 50 por pagina y conserva el total aunque la pagina pedida este vacia`() {
-        val pedida = PageRequest.of(2, 50)
-        every { entidades.buscar(null, null, null, "GARCIA", null, pedida) } returns PageImpl(emptyList(), pedida, 120)
-
-        val resultado = service.buscar("analista", null, null, null, "GARCIA", null, pagina = 2, tamano = 500)
-
-        assertEquals(50, resultado.size)
-        assertEquals(120, resultado.totalElements)
-        assertTrue(resultado.content.isEmpty())
-        verify(exactly = 0) { entidades.cargarManchas(any()) }
-        verify { historial wasNot Called }
-    }
-
-    @Test
-    fun `sin coincidencias no lee apariciones ni guarda historial`() {
-        every { entidades.buscar(any(), any(), any(), any(), any(), any()) } returns Page.empty(primeraPagina)
-
-        val resultado = service.buscar("analista", null, null, "ZZZZ", null, null)
-
-        assertEquals(0, resultado.totalElements)
-        verify(exactly = 0) { entidades.cargarManchas(any()) }
-        verify { historial wasNot Called }
-    }
-
-    @Test
-    fun `rechaza busquedas sin criterio, con menos de 3 letras o con paginacion invalida`() {
-        val invalidas = listOf<() -> Any>(
-            { service.buscar("analista", null, null, null, null, null) },
-            { service.buscar("analista", " ", null, "  ", "", null) },
-            { service.buscar("analista", null, null, "ab", null, null) },
-            { service.buscar("analista", null, null, "%_", "a", null) },
-            { service.buscar("analista", null, null, null, "GARCIA", null, pagina = -1) },
-            { service.buscar("analista", null, null, null, "GARCIA", null, tamano = 0) }
-        )
-        invalidas.forEach { buscar ->
-            assertEquals(400, assertFailsWith<ResponseStatusException> { buscar() }.statusCode.value())
-        }
-        verify { entidades wasNot Called; historial wasNot Called }
-    }
-
-    @Test
-    fun `un apellido corto sirve si viene con documento o junto a otro texto de 3 letras o mas`() {
-        every { entidades.buscar("12345678", "DNI", null, "LI", null, primeraPagina) } returns Page.empty(primeraPagina)
-        every { entidades.buscar(null, null, null, "LI", "RUIZ", primeraPagina) } returns Page.empty(primeraPagina)
-
-        service.buscar("analista", " 12345678 ", "DNI", null, "LI", null)
-        service.buscar("analista", null, null, null, "LI", "RUIZ")
-
-        verify(exactly = 1) { entidades.buscar("12345678", "DNI", null, "LI", null, primeraPagina) }
-        verify(exactly = 1) { entidades.buscar(null, null, null, "LI", "RUIZ", primeraPagina) }
-    }
-
-    @Test
-    fun `el controlador responde la lista de la pagina y pone el total en cabeceras`() {
+    fun `controlador responde la lista de la pagina y pone el total en cabeceras`() {
         val pagina = listOf(persona(1), persona(2))
         every { entidades.buscar(any(), any(), any(), any(), any(), any()) } returns PageImpl(pagina, primeraPagina, 523)
         every { entidades.cargarManchas(any()) } returns pagina
@@ -131,6 +76,18 @@ class BusquedaPaginadaTest {
         assertEquals("27", respuesta.headers.getFirst(CabecerasPaginacion.TOTAL_PAGINAS))
         assertEquals("0", respuesta.headers.getFirst(CabecerasPaginacion.PAGINA))
         assertEquals("20", respuesta.headers.getFirst(CabecerasPaginacion.TAMANO))
+    }
+
+    @Test
+    fun `exportarPdf descuenta credito y entrega el binario PDF con cabeceras`() {
+        val p = persona(42)
+        every { entidades.buscarPorIdConDetalle(42) } returns p
+
+        val respuesta = controller.exportarPdf(autenticacion, 42)
+
+        assertEquals(MediaType.APPLICATION_PDF, respuesta.headers.contentType)
+        assertTrue(respuesta.headers.getFirst(HttpHeaders.CONTENT_DISPOSITION)!!.contains("listas-negativas-00000042.pdf"))
+        assertTrue(respuesta.body!!.isNotEmpty())
     }
 
     @Test

@@ -6,6 +6,8 @@ import com.security.modules.listas.dto.ResultadoBusquedaResponse
 import com.security.shared.config.CabecerasPaginacion
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
@@ -64,5 +66,20 @@ class ListaNegativaController(
     @GetMapping("/{id}")
     fun detalle(@PathVariable id: Int): ResponseEntity<ResultadoBusquedaResponse> {
         return ResponseEntity.ok(listaNegativaService.obtenerDetalle(id))
+    }
+
+    @GetMapping("/{id}/pdf")
+    fun exportarPdf(
+        authentication: Authentication,
+        @PathVariable id: Int
+    ): ResponseEntity<ByteArray> {
+        val detalle = listaNegativaService.obtenerDetalle(id)
+        val pdf = listaNegativaService.exportarPdf(authentication.name, id)
+        val filename = "listas-negativas-${detalle.documento}.pdf"
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"$filename\"")
+            .contentType(MediaType.APPLICATION_PDF)
+            .body(pdf)
     }
 }

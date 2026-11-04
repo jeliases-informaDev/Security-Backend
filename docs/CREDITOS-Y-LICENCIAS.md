@@ -50,6 +50,7 @@ Este documento describe la arquitectura de **consumo y recepción de créditos**
 | Módulo | Acción (`AccionCredito`) | Costo | Descripción / Regla |
 |---|---|:---:|---|
 | **Listas Negativas** | `LISTA_BUSQUEDA` | 1 | Cobro únicamente en la primera página (`page = 0`). La paginación adicional y el historial no descuentan. |
+| **Listas Negativas** | `LISTA_PDF` | 1 | Descarga oficial de reporte de coincidencia / ficha en PDF (`GET /api/listas-negativas/{id}/pdf`). |
 | **Scoring** | `SCORING_EVALUAR` | 2 | Por cada evaluación ejecutada y guardada. |
 | **Matrices** | `MATRIZ_REGISTRAR` | 3 | Por registrar formalmente el análisis (estado `ABIERTO`). Los borradores no cobran. |
 | **Matrices** | `MATRIZ_PDF` | 1 | Por cada exportación de matriz a PDF. |
@@ -61,13 +62,12 @@ Este documento describe la arquitectura de **consumo y recepción de créditos**
 
 ---
 
-## 6. Endpoints Disponibles (`/api/licencias`)
+## 6. Endpoints Disponibles en este Backend
 
-| Método | Endpoint | Rol Mínimo | Descripción |
-|---|---|---|---|
-| `GET` | `/api/licencias/mi-bolsa` | Cualquier usuario autenticado | Estado de la bolsa, créditos consumidos, disponibles, tolerancia y vencimiento de su empresa. |
-| `GET` | `/api/licencias/empresas/{empresaId}` | `ADMINISTRADOR_EMPRESA` / `ADMINISTRADOR` | Consulta de bolsa de una empresa específica. |
-| `POST` | `/api/licencias/sincronizar` | `ADMINISTRADOR` (Sulotec) | Recepción y sincronización de la bolsa asignada (créditos totales, cupo de usuarios, tolerancia y vencimiento). |
-| `GET` | `/api/licencias/movimientos` | Según rol | Historial paginado de consumos de la empresa. |
-| `GET` | `/api/licencias/avisos` | `ADMINISTRADOR_EMPRESA` | Notificaciones internas de consumo (80%, exceso, vencimiento). |
-| `PATCH` | `/api/licencias/avisos/{id}/leido` | `ADMINISTRADOR_EMPRESA` | Marcar notificación como leída. |
+### Licencias y Bolsa (`/api/licencias`)
+- `GET /api/licencias/mi-bolsa`: Devuelve el saldo de créditos, porcentaje consumido, días restantes y estado de la empresa del usuario autenticado.
+- `GET /api/licencias/movimientos`: Historial paginado de consumos y recargas de la empresa.
+- `GET /api/licencias/avisos`: Notificaciones internas (80% consumo, exceso de tolerancia, proximidad de vencimiento).
+- `PUT /api/licencias/avisos/{id}/leido`: Marca un aviso como leído.
+- `POST /api/licencias/sincronizar`: **Solo para Sulotec Central (Rol `ADMINISTRADOR`)**. Recibe la asignación de créditos, cupo de usuarios y vencimiento tras una compra/recarga en Sulotec.
+- `GET /api/licencias/empresas/{empresaId}`: Consulta el estado de licencia de cualquier empresa (solo `ADMINISTRADOR`).

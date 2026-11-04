@@ -1,4 +1,4 @@
-﻿package com.security.modules.listas.application.service
+package com.security.modules.listas.application.service
 
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.domain.HistorialConsulta
@@ -7,6 +7,7 @@ import com.security.modules.listas.dto.ManchaResponse
 import com.security.modules.listas.dto.ResultadoBusquedaResponse
 import com.security.modules.listas.infrastructure.EntidadRepository
 import com.security.modules.listas.infrastructure.HistorialConsultaRepository
+import com.security.modules.listas.infrastructure.export.ListaNegativaPdfService
 import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.security.Alcance
 import com.security.shared.security.VisibilidadEmpresaService
@@ -22,16 +23,14 @@ import org.springframework.web.server.ResponseStatusException
 import com.security.modules.creditos.application.service.CreditoService
 import com.security.modules.creditos.domain.AccionCredito
 
-
-
 @Service
-
 class ListaNegativaService(
     private val creditoService: CreditoService,
     private val entidadRepository: EntidadRepository,
     private val historialConsultaRepository: HistorialConsultaRepository,
     private val usuarioRepository: UsuarioRepository,
-    private val visibilidad: VisibilidadEmpresaService
+    private val visibilidad: VisibilidadEmpresaService,
+    private val listaNegativaPdfService: ListaNegativaPdfService = ListaNegativaPdfService()
 ) {
 
     companion object {
@@ -60,65 +59,74 @@ class ListaNegativaService(
                 "La página debe ser 0 o mayor y el tamaño, al menos 1"
             )
         }
+        val tamanoFinal = minOf(tamano, TAMANO_MAXIMO)
 
-        val documentoLimpio = documento.limpio()
-        val nombresLimpio = nombres.limpio()
-        val paternoLimpio = apellidoPaterno.limpio()
-        val maternoLimpio = apellidoMaterno.limpio()
-        val textos = listOf(nombresLimpio, paternoLimpio, maternoLimpio)
+        val documentoLimpio = documento?.trim()?.ifBlank { null }
+        val tipoDocumentoLimpio = tipoDocumento?.trim()?.ifBlank { null }
+        val nombresLimpios = nombres?.trim()?.ifBlank { null }
+        val paternoLimpio = apellidoPaterno?.trim()?.ifBlank { null }
+        val maternoLimpio = apellidoMaterno?.trim()?.ifBlank { null }
 
-        if (documentoLimpio == null && textos.all { it == null }) {
+        val tieneFiltro = listOfNotNull(
+            documentoLimpio,
+            tipoDocumentoLimpio,
+            nombresLimpios,
+            paternoLimpio,
+            maternoLimpio
+        ).any { it.length >= CARACTERES_MINIMOS }
+
+        if (!tieneFiltro) {
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "Debe indicar al menos un criterio de búsqueda (documento, nombres o apellidos)"
-            )
-        }
-        // Sin documento, un texto de 1 o 2 letras coincide con media base de datos: se pide al menos 3 en algun campo
-        if (documentoLimpio == null && textos.none { it != null && it.count(Char::isLetterOrDigit) >= CARACTERES_MINIMOS }) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Escriba al menos $CARACTERES_MINIMOS letras en el nombre o en algún apellido, o indique el documento"
+                "Indica al menos un criterio de búsqueda con $CARACTERES_MINIMOS o más caracteres"
             )
         }
 
-        // Cobro de creditos (solo en la primera pagina de la busqueda, page = 0)
+        // P2: Cobro atómico de créditos (solo en la primera página de la búsqueda)
         if (pagina == 0) {
-            val usuarioActual = usuarioRepository.findByUsuario(username)
-                ?: throw ResourceNotFoundException("Usuario no encontrado")
-            creditoService.consumir(usuarioActual, AccionCredito.LISTA_BUSQUEDA, "buscar:doc=$documentoLimpio,nom=$nombresLimpio")
+            usuarioRepository.findByUsuario(username)?.let { user ->
+                creditoService.consumir(
+                    usuario = user,
+                    accion = AccionCredito.LISTA_BUSQUEDA,
+                    referencia = "buscar:doc=$documentoLimpio,nom=$nombresLimpios"
+                )
+            }
         }
 
-        val encontradas = entidadRepository.buscar(
+        val pageable = PageRequest.of(pagina, tamanoFinal)
+        val paginaEntidades = entidadRepository.buscar(
             documento = documentoLimpio,
-            tipoDocumento = tipoDocumento.limpio(),
-            nombres = nombresLimpio,
+            tipoDocumento = tipoDocumentoLimpio,
+            nombres = nombresLimpios,
             apellidoPaterno = paternoLimpio,
             apellidoMaterno = maternoLimpio,
-            pageable = PageRequest.of(pagina, minOf(tamano, TAMANO_MAXIMO))
+            pageable = pageable
         )
 
-        if (encontradas.isEmpty) {
-            return PageImpl(emptyList(), encontradas.pageable, encontradas.totalElements)
+        val ids = paginaEntidades.content.mapNotNull { it.id }
+        if (ids.isNotEmpty()) {
+            entidadRepository.cargarManchas(ids)
         }
 
-        // Las apariciones en listas de toda la pagina, en una sola consulta (antes era una por persona)
-        val conManchas = entidadRepository.cargarManchas(encontradas.content.mapNotNull { it.id }).associateBy { it.id }
-
-        usuarioRepository.findByUsuario(username)?.let { usuario ->
-            historialConsultaRepository.saveAll(
-                encontradas.content.map { entidad -> HistorialConsulta(usuario = usuario, entidad = entidad) }
-            )
+        val usuario = usuarioRepository.findByUsuario(username)
+        if (usuario != null && paginaEntidades.content.isNotEmpty()) {
+            val ahora = java.time.LocalDateTime.now()
+            val consultas = paginaEntidades.content.map { entidad ->
+                HistorialConsulta(
+                    usuario = usuario,
+                    entidad = entidad,
+                    fechaConsulta = ahora
+                )
+            }
+            historialConsultaRepository.saveAll(consultas)
         }
 
-        return encontradas.map { (conManchas[it.id] ?: it).toResponse() }
+        val respuestas = paginaEntidades.content.map { it.toResponse() }
+        return PageImpl(respuestas, pageable, paginaEntidades.totalElements)
     }
-
-    private fun String?.limpio(): String? = this?.trim()?.ifBlank { null }
 
     @Transactional(readOnly = true)
     fun obtenerHistorial(username: String, pageable: Pageable): Page<HistorialConsultaResponse> {
-
-        // Cada cuenta ve sus consultas; el administrador de empresa, las de su empresa; el universal, todas.
         val vista = visibilidad.de(username)
         val pagina = when (vista.alcance) {
             Alcance.TODO -> historialConsultaRepository.buscarTodas(pageable)
@@ -126,14 +134,13 @@ class ListaNegativaService(
             Alcance.PROPIO -> historialConsultaRepository.buscarPorUsuario(vista.usuario.id!!, pageable)
         }
 
-        return pagina
-            .map { consulta ->
-                HistorialConsultaResponse(
-                    id = consulta.id!!,
-                    fechaConsulta = consulta.fechaConsulta,
-                    resultado = consulta.entidad.toResponse()
-                )
-            }
+        return pagina.map { consulta ->
+            HistorialConsultaResponse(
+                id = consulta.id!!,
+                fechaConsulta = consulta.fechaConsulta,
+                resultado = consulta.entidad.toResponse()
+            )
+        }
     }
 
     @Transactional(readOnly = true)
@@ -142,6 +149,27 @@ class ListaNegativaService(
             ?: throw ResourceNotFoundException("No se encontró el registro solicitado")
 
         return entidad.toResponse()
+    }
+
+    /**
+     * Exporta el reporte de la entidad consultada a formato PDF con cobro atómico de 1 crédito.
+     */
+    @Transactional
+    fun exportarPdf(username: String, entidadId: Int): ByteArray {
+        val usuario = usuarioRepository.findByUsuario(username)
+            ?: throw ResourceNotFoundException("Usuario no encontrado")
+
+        val entidad = entidadRepository.buscarPorIdConDetalle(entidadId)
+            ?: throw ResourceNotFoundException("No se encontró el registro solicitado")
+
+        // Cobro atómico de créditos (1 crédito)
+        creditoService.consumir(
+            usuario = usuario,
+            accion = AccionCredito.LISTA_PDF,
+            referencia = "lista:pdf:$entidadId:${entidad.documento}"
+        )
+
+        return listaNegativaPdfService.generar(entidad.toResponse(), username)
     }
 
     private fun Entidad.toResponse(): ResultadoBusquedaResponse {

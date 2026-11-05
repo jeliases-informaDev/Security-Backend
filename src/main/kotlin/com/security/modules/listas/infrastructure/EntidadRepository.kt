@@ -59,6 +59,35 @@ interface EntidadRepository : JpaRepository<Entidad, Int> {
         pageable: Pageable
     ): Page<Entidad>
 
+    // Si la persona esta entre los resultados de esa busqueda (para elegir un candidato sin volver a buscar todo).
+    @Query(
+        """
+        SELECT COUNT(e) FROM Entidad e
+        JOIN e.tipoDocumento td
+        LEFT JOIN e.personaNatural pn
+        LEFT JOIN e.personaJuridica pj
+        WHERE e.id = :id
+        AND (:documento IS NULL OR e.documento = :documento)
+        AND (:tipoDocumento IS NULL OR td.nombre = :tipoDocumento)
+        AND (:apellidoPaterno IS NULL OR UPPER(pn.apePat) LIKE UPPER(CONCAT('%', :apellidoPaterno, '%')))
+        AND (:apellidoMaterno IS NULL OR UPPER(pn.apeMat) LIKE UPPER(CONCAT('%', :apellidoMaterno, '%')))
+        AND (
+            :nombres IS NULL
+            OR UPPER(pn.nombre) LIKE UPPER(CONCAT('%', :nombres, '%'))
+            OR UPPER(pn.segundoNombre) LIKE UPPER(CONCAT('%', :nombres, '%'))
+            OR UPPER(pj.razonSocial) LIKE UPPER(CONCAT('%', :nombres, '%'))
+        )
+        """
+    )
+    fun contarEnBusqueda(
+        @Param("id") id: Int,
+        @Param("documento") documento: String?,
+        @Param("tipoDocumento") tipoDocumento: String?,
+        @Param("nombres") nombres: String?,
+        @Param("apellidoPaterno") apellidoPaterno: String?,
+        @Param("apellidoMaterno") apellidoMaterno: String?
+    ): Long
+
     // Segunda consulta de la busqueda: las apariciones en listas (con su lista y su grupo) de todas las personas de
     // la pagina de una sola vez, en lugar de una consulta por persona.
     @Query(

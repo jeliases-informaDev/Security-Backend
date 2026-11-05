@@ -48,10 +48,11 @@ class ScoringController(
     // Consulta a Listas Negativas por documento: no consume tokens
     @GetMapping("/cliente")
     fun cliente(
+        authentication: Authentication,
         @RequestParam("documento", required = false) documento: String?,
         @RequestParam("tipoDocumento", required = false) tipoDocumento: String?
     ): ResponseEntity<ClienteScoringResponse> =
-        ResponseEntity.ok(scoringService.consultarCliente(documento, tipoDocumento))
+        ResponseEntity.ok(scoringService.consultarCliente(documento, tipoDocumento, authentication.name))
 
     // No guarda ni consume tokens; acepta datos a medias
     @PostMapping("/vista-previa")

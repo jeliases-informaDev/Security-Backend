@@ -4,6 +4,8 @@ import com.security.modules.licencias.LicenciaContexto
 import com.security.modules.licencias.LicenciaReglas
 import com.security.modules.licencias.LicenciaService
 import com.security.modules.licencias.dominio.TIPO_SCORING
+import com.security.modules.listas.application.service.HomonimoVigente
+import com.security.modules.listas.application.service.HomonimosListasService
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.infrastructure.EntidadRepository
 import com.security.modules.scoring.domain.ScoringDepartamento
@@ -75,7 +77,9 @@ class ScoringService(
     private val visibilidad: VisibilidadEmpresaService,
     private val licenciaContexto: LicenciaContexto,
     private val licenciaService: LicenciaService,
-    private val volumenOperaciones: VolumenOperacionesConsulta
+    private val volumenOperaciones: VolumenOperacionesConsulta,
+    // Descartes "Es homonimo" de Listas Negativas (null en las pruebas que arman el servicio a mano: no hay descartes)
+    private val homonimos: HomonimosListasService? = null
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -121,11 +125,12 @@ class ScoringService(
     // =====================================================================
 
     @Transactional(readOnly = true)
-    fun consultarCliente(documento: String?, tipoDocumento: String?): ClienteScoringResponse {
+    fun consultarCliente(documento: String?, tipoDocumento: String?, username: String? = null): ClienteScoringResponse {
         val doc = documento?.trim()?.takeIf { it.isNotEmpty() }
             ?: throw ScoringException(HttpStatus.BAD_REQUEST, "SCORING_DOCUMENTO_OBLIGATORIO", "Escribe el documento del cliente.")
         val entidad = buscarEnListas(doc, tipoDocumento)
-        val consulta = clasificar(entidad)
+        val homonimo = homonimoDe(username?.let { usuarioRepository.findByUsuario(it) }, entidad)
+        val consulta = clasificar(entidad, homonimo)
         val condicion = ClasificadorListas.condicion(metodologia, consulta)
         return ClienteScoringResponse(
             encontrado = entidad != null,
@@ -134,7 +139,7 @@ class ScoringService(
             tipoDocumento = entidad?.tipoDocumento?.nombre,
             documento = entidad?.documento ?: doc,
             nombre = entidad?.let { nombreDe(it) },
-            consulta = consultaResponse(consulta),
+            consulta = consultaResponse(consulta, homonimo),
             condicion = CondicionResponse(condicion.puntaje, condicion.etiqueta),
             reglas = reglasDeListas(condicion)
         )
@@ -151,7 +156,13 @@ class ScoringService(
     private fun conManchas(entidad: Entidad): Entidad =
         entidad.id?.let { id -> entidadRepository.cargarManchas(listOf(id)).firstOrNull() } ?: entidad
 
-    private fun clasificar(entidad: Entidad?): ConsultaListasResultado {
+    /** Si la empresa de quien evalua descarto a esa persona como homonimo en Listas Negativas (la marca vigente). */
+    private fun homonimoDe(usuario: Usuario?, entidad: Entidad?): HomonimoVigente? =
+        entidad?.id?.let { homonimos?.vigente(usuario, it) }
+
+    // Descartada como homonimo: sus apariciones no cuentan (ni PEP ni sanciones ni noticias), como dice Listas Negativas.
+    private fun clasificar(entidad: Entidad?, homonimo: HomonimoVigente? = null): ConsultaListasResultado {
+        if (homonimo != null) return ClasificadorListas.clasificar(metodologia, emptyList())
         val apariciones = entidad?.manchas?.map {
             AparicionLista(it.tipoLista.esPep, it.tipoLista.nombre, it.tipoLista.grupo?.orden)
         } ?: emptyList()
@@ -159,12 +170,21 @@ class ScoringService(
     }
 
     // Parientes, conyuge y empresas vinculadas a un PEP: la base de listas no tiene ese dato (revisado: false).
-    private fun consultaResponse(c: ConsultaListasResultado) = ConsultaListasResponse(
+    private fun consultaResponse(c: ConsultaListasResultado, homonimo: HomonimoVigente? = null) = ConsultaListasResponse(
         fecha = LocalDateTime.now().withNano(0),
         pep = CoincidenciaListas(true, c.pep),
         vinculados = CoincidenciaListas(false, null),
         sanciones = CoincidenciaListas(true, c.sanciones),
-        noticias = CoincidenciaListas(true, c.noticias)
+        noticias = CoincidenciaListas(true, c.noticias),
+        homonimo = homonimo?.let {
+            HomonimoListasResponse(
+                consultaId = it.consultaId,
+                fecha = it.fecha,
+                usuario = it.usuario,
+                comentario = it.comentario,
+                texto = "Descartado como homónimo el ${it.fecha?.format(FORMATO_FECHA_HOMONIMO) ?: "—"} por ${it.usuario}"
+            )
+        }
     )
 
     private fun reglasDeListas(condicion: CondicionCliente): List<ReglaResponse> = buildList {
@@ -293,7 +313,8 @@ class ScoringService(
         val documentoNuevo = clienteNuevo?.documento?.trim()
         // Aunque se registre como nuevo, su documento se consulta en las listas: nunca se afirma "sin coincidencias" sin mirar.
         val entidadConsulta = entidad ?: documentoNuevo?.let { buscarEnListas(it, clienteNuevo?.tipoDocumento) }
-        val consulta = if (entidad != null || clienteNuevo != null) clasificar(entidadConsulta) else null
+        val homonimo = homonimoDe(usuario, entidadConsulta)
+        val consulta = if (entidad != null || clienteNuevo != null) clasificar(entidadConsulta, homonimo) else null
         val condicion = consulta?.let { ClasificadorListas.condicion(metodologia, it) }
 
         // ---- Opciones elegidas (un id que no existe bloquea; uno que falta lo informa el calculo)
@@ -361,7 +382,7 @@ class ScoringService(
             entidad = entidad,
             cliente = cliente,
             condicion = condicion,
-            consulta = consulta?.let { consultaResponse(it) },
+            consulta = consulta?.let { consultaResponse(it, homonimo) },
             ocupacion = ocupacion,
             departamentoResidencia = depRes,
             departamentoOperacion = depOp,
@@ -675,5 +696,6 @@ class ScoringService(
         private val ACCIONES = setOf(ACCION_APROBAR, ACCION_ENVIAR, ACCION_RECHAZAR)
         private val TIPOS_PERSONA = setOf("NATURAL", "JURIDICA")
         private val TIPOS_DOCUMENTO = setOf("DNI", "CE", "RUC", "PASAPORTE")
+        private val FORMATO_FECHA_HOMONIMO: java.time.format.DateTimeFormatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
     }
 }

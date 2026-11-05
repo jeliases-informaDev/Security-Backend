@@ -46,7 +46,18 @@ data class ConsultaListasResponse(
     val pep: CoincidenciaListas,
     val vinculados: CoincidenciaListas,
     val sanciones: CoincidenciaListas,
-    val noticias: CoincidenciaListas
+    val noticias: CoincidenciaListas,
+    /** La empresa descarto a esta persona como homonimo en Listas Negativas: sus apariciones no cuentan. null = no. */
+    val homonimo: HomonimoListasResponse? = null
+)
+
+data class HomonimoListasResponse(
+    val consultaId: Long,
+    val fecha: LocalDateTime?,
+    val usuario: String,
+    val comentario: String?,
+    /** "Descartado como homonimo el 05/11/2026 por Ana T." */
+    val texto: String
 )
 
 data class CondicionResponse(val puntaje: Int, val etiqueta: String)

@@ -4,6 +4,8 @@ import com.security.modules.licencias.ContextoLicencia
 import com.security.modules.licencias.LicenciaContexto
 import com.security.modules.licencias.LicenciaService
 import com.security.modules.licencias.dominio.TIPO_SCORING
+import com.security.modules.listas.application.service.HomonimoVigente
+import com.security.modules.listas.application.service.HomonimosListasService
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.domain.HistorialMancha
 import com.security.modules.listas.domain.ListaGrupo
@@ -393,5 +395,43 @@ class ScoringServiceTest {
         evaluacionDe(analista)
         val e = assertFailsWith<ScoringException> { service.decidir("analista", 40, DecisionRequest("APROBAR")) }
         assertEquals("SCORING_VERSION_ANTIGUA", e.code)
+    }
+
+    // ---------------- Homonimo descartado en Listas Negativas ----------------
+
+    private fun conHomonimos(vigente: HomonimoVigente?): ScoringService {
+        val homonimos = mockk<HomonimosListasService>()
+        every { homonimos.vigente(any(), any()) } returns vigente
+        return ScoringService(
+            entidadRepository, ocupacionRepository, departamentoRepository, opcionRepository, paisGrupoRepository,
+            paisRepository, scoringRiesgoRepository, sustentoRepository, usuarioRepository,
+            VisibilidadEmpresaService(usuarioRepository), contexto, licencias, volumen, homonimos
+        )
+    }
+
+    @Test
+    fun `una persona descartada como homonimo por la empresa no aplica PEP ni sanciones en el paso 1`() {
+        val e = entidad(esPep = true, sancion = true)
+        every { entidadRepository.buscar("00000001", any(), any(), any(), any(), any()) } returns PageImpl(listOf(e))
+
+        val sinDescarte = conHomonimos(null).consultarCliente("00000001", null, "analista")
+        assertEquals(1, sinDescarte.consulta.pep.coincidencias)
+        assertEquals(listOf("PEP", "SANCIONES"), sinDescarte.reglas.map { it.codigo })
+        assertNull(sinDescarte.consulta.homonimo)
+
+        val descartado = HomonimoVigente(901, LocalDateTime.of(2026, 11, 5, 16, 40), "Ana T.", "Otra persona")
+        val conDescarte = conHomonimos(descartado).consultarCliente("00000001", null, "analista")
+        assertEquals(0, conDescarte.consulta.pep.coincidencias)
+        assertEquals(0, conDescarte.consulta.sanciones.coincidencias)
+        assertEquals(0, conDescarte.consulta.noticias.coincidencias)
+        assertTrue(conDescarte.reglas.isEmpty())
+        assertEquals("Descartado como homónimo el 05/11/2026 por Ana T.", conDescarte.consulta.homonimo?.texto)
+        assertEquals(901L, conDescarte.consulta.homonimo?.consultaId)
+
+        // La evaluacion tampoco aplica la regla PEP por esa coincidencia
+        val r = conHomonimos(descartado).evaluar("analista", datos())
+        assertFalse("PEP" in r.reglas.map { it.codigo })
+        assertFalse("SANCIONES" in r.reglas.map { it.codigo })
+        assertNotNull(r.consulta?.homonimo)
     }
 }

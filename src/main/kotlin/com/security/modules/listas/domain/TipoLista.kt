@@ -37,5 +37,9 @@ class TipoLista(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_grupo")
-    var grupo: ListaGrupo? = null
+    var grupo: ListaGrupo? = null,
+
+    // Fecha de la ultima carga de la lista (la pone quien carga los datos). Opcional: sin fecha no se muestra nada.
+    @Column(name = "ultima_carga")
+    var ultimaCarga: java.time.LocalDate? = null
 )

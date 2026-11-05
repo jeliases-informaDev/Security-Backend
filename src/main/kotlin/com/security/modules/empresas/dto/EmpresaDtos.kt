@@ -12,12 +12,18 @@ data class EmpresaCreateRequest(
     val ruc: String? = null,
 
     // Opcional: 2 a 8 letras o digitos; si no viene se propone a partir del nombre.
-    val sigla: String? = null
+    val sigla: String? = null,
+
+    // Opcional: el UUID de la empresa en la cuenta Sulotec (asi la reconoce el servicio de licencias); si no viene se genera.
+    val uuid: String? = null
 )
 
-/** El nombre no se cambia (ver Empresa); solo se puede corregir el RUC. */
+/** El nombre no se cambia (ver Empresa); se puede corregir el RUC y, si viene, igualar el UUID con el de la cuenta Sulotec. */
 data class EmpresaUpdateRequest(
-    val ruc: String? = null
+    val ruc: String? = null,
+
+    // Opcional: si no viene, el UUID se queda como esta.
+    val uuid: String? = null
 )
 
 data class EmpresaResponse(

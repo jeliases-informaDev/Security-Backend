@@ -20,16 +20,12 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.time.LocalDateTime
-import com.security.modules.creditos.application.service.CreditoService
-import com.security.modules.creditos.domain.AccionCredito
 
 
 
 @Service
 
 class MatrizRiesgoRegistroService(
-    private val creditoService: CreditoService,
-
     private val usuarioRepository: UsuarioRepository,
     private val areaRepository: MatrizRiesgoAreaRepository,
     private val procesoRepository: MatrizRiesgoProcesoRepository,
@@ -68,10 +64,6 @@ class MatrizRiesgoRegistroService(
         username: String,
         request: GuardarMatrizRiesgoRequest
     ): MatrizRiesgoRegistroResponse {
-
-        val usuario = usuarioRepository.findByUsuario(username)
-            ?: throw ResourceNotFoundException("Usuario no encontrado")
-        creditoService.consumir(usuario, AccionCredito.MATRIZ_REGISTRAR, "matriz:areaId=${request.areaId},procesoId=${request.procesoId}")
 
         return persistir(
             username = username,

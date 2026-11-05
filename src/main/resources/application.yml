@@ -32,6 +32,16 @@ ml:
   timeout-seconds: 15
   chat-timeout-seconds: 120
 
+# Servicio comun de licencias de Sulotec (la unica verdad de la licencia de cada empresa).
+# Con LICENCIAS_URL o LICENCIAS_TOKEN vacios las licencias estan apagadas: nada se consulta, nada se bloquea.
+licencias:
+  url: ${LICENCIAS_URL:}
+  token: ${LICENCIAS_TOKEN:}
+  producto: ${LICENCIAS_PRODUCTO:plaft}
+  timeout-segundos: 3
+  cache-segundos: 300
+  pausa-tras-fallo-segundos: 30
+
 # Firma de los tokens JWT (minimo 32 caracteres). En un entorno real define JWT_SECRET.
 jwt:
   secret: ${JWT_SECRET:CLAVE-TEMPORAL-SOLO-PARA-DESARROLLO-123456789}

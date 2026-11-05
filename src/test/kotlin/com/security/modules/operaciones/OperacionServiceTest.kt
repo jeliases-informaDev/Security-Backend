@@ -14,7 +14,7 @@ import kotlin.test.*
 
 class OperacionServiceTest {
     private val repository = mockk<OperacionRepository>()
-    private val service = OperacionService(mockk(relaxed = true), repository, mockk())
+    private val service = OperacionService(repository, mockk())
     private val date = LocalDate.of(2026, 10, 12)
 
     private fun request() = RegistrarOperacionRequest(

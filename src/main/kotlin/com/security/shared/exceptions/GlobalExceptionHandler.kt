@@ -1,5 +1,9 @@
 ﻿package com.security.shared.exceptions
 
+import com.security.modules.licencias.LicenciaBloqueadaException
+import com.security.modules.licencias.LicenciaBolsaAgotadaException
+import com.security.modules.licencias.LicenciaReglas
+import com.security.modules.licencias.LicenciaSinCupoException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -174,48 +178,6 @@ class GlobalExceptionHandler {
         )
     }
 
-    // 402 - Saldo insuficiente de creditos/tokens (P3)
-    @ExceptionHandler(com.security.modules.creditos.domain.exceptions.SaldoInsuficienteException::class)
-    fun handleSaldoInsuficiente(
-        ex: com.security.modules.creditos.domain.exceptions.SaldoInsuficienteException,
-        request: HttpServletRequest
-    ): ResponseEntity<ApiErrorResponse> {
-
-        return buildResponse(
-            status = HttpStatus.PAYMENT_REQUIRED,
-            message = ex.message ?: "Saldo insuficiente de créditos",
-            request = request
-        )
-    }
-
-    // 403 - Licencia en solo lectura o suspendida (P4)
-    @ExceptionHandler(com.security.modules.creditos.domain.exceptions.LicenciaVencidaException::class)
-    fun handleLicenciaVencida(
-        ex: com.security.modules.creditos.domain.exceptions.LicenciaVencidaException,
-        request: HttpServletRequest
-    ): ResponseEntity<ApiErrorResponse> {
-
-        return buildResponse(
-            status = HttpStatus.FORBIDDEN,
-            message = ex.message ?: "Licencia no vigente",
-            request = request
-        )
-    }
-
-    // 409 - Cupo maximo de usuarios alcanzado (P2)
-    @ExceptionHandler(com.security.modules.creditos.domain.exceptions.CupoUsuariosExcedidoException::class)
-    fun handleCupoUsuariosExcedido(
-        ex: com.security.modules.creditos.domain.exceptions.CupoUsuariosExcedidoException,
-        request: HttpServletRequest
-    ): ResponseEntity<ApiErrorResponse> {
-
-        return buildResponse(
-            status = HttpStatus.CONFLICT,
-            message = ex.message ?: "Cupo de usuarios excedido",
-            request = request
-        )
-    }
-
     // 409 - Conflicto (dato duplicado, etc.)
     @ExceptionHandler(ConflictException::class)
     fun handleConflict(
@@ -227,6 +189,57 @@ class GlobalExceptionHandler {
             status = HttpStatus.CONFLICT,
             message = ex.message ?: "Conflicto con el estado actual del recurso",
             request = request
+        )
+    }
+
+    // 402 - La empresa usó todos los tokens del mes, incluida la tolerancia (servicio común de licencias)
+    @ExceptionHandler(LicenciaBolsaAgotadaException::class)
+    fun handleLicenciaBolsaAgotada(
+        ex: LicenciaBolsaAgotadaException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.PAYMENT_REQUIRED,
+            message = ex.message ?: LicenciaReglas.MENSAJE_BOLSA_AGOTADA,
+            request = request,
+            code = ex.code,
+            enlace = ex.enlace
+        )
+    }
+
+    // 403 - La licencia no permite registrar cambios (solo lectura, suspendida o cancelada)
+    @ExceptionHandler(LicenciaBloqueadaException::class)
+    fun handleLicenciaBloqueada(
+        ex: LicenciaBloqueadaException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.FORBIDDEN,
+            message = ex.message ?: LicenciaReglas.mensajeDeEstado(ex.estado),
+            request = request,
+            code = ex.code,
+            enlace = ex.enlace,
+            estado = ex.estado
+        )
+    }
+
+    // 409 - El plan llegó al máximo de usuarios activos
+    @ExceptionHandler(LicenciaSinCupoException::class)
+    fun handleLicenciaSinCupo(
+        ex: LicenciaSinCupoException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.CONFLICT,
+            message = ex.message ?: LicenciaReglas.textoCupo(ex.activos, ex.usuariosMax),
+            request = request,
+            code = ex.code,
+            enlace = ex.enlace,
+            activos = ex.activos,
+            usuariosMax = ex.usuariosMax
         )
     }
 
@@ -247,14 +260,24 @@ class GlobalExceptionHandler {
     private fun buildResponse(
         status: HttpStatus,
         message: String,
-        request: HttpServletRequest
+        request: HttpServletRequest,
+        code: String? = null,
+        enlace: String? = null,
+        estado: String? = null,
+        activos: Long? = null,
+        usuariosMax: Long? = null
     ): ResponseEntity<ApiErrorResponse> {
 
         val response = ApiErrorResponse(
             status = status.value(),
             error = status.reasonPhrase,
             message = message,
-            path = request.requestURI
+            path = request.requestURI,
+            code = code,
+            enlace = enlace,
+            estado = estado,
+            activos = activos,
+            usuariosMax = usuariosMax
         )
 
         return ResponseEntity

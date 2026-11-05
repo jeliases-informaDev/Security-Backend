@@ -49,6 +49,7 @@ class EmpresaService(
         if (ruc != null && empresaRepository.findByRuc(ruc) != null) {
             throw ConflictException("Ya existe una empresa con ese RUC")
         }
+        val uuid = normalizarUuid(request.uuid)?.also { validarUuidLibre(it, null) } ?: UUID.randomUUID().toString()
         val sigla = normalizarSigla(request.sigla)?.also {
             if (!SIGLA_VALIDA.matches(it)) {
                 throw ResponseStatusException(HttpStatus.BAD_REQUEST, "La sigla debe tener de 2 a 8 letras o números")
@@ -60,7 +61,7 @@ class EmpresaService(
 
         val ahora = LocalDateTime.now()
         val guardada = empresaRepository.save(
-            Empresa(nombre = nombre, ruc = ruc, uuid = UUID.randomUUID().toString(), sigla = sigla, activa = true,
+            Empresa(nombre = nombre, ruc = ruc, uuid = uuid, sigla = sigla, activa = true,
                 fechaCreacion = ahora, fechaActualizacion = ahora)
         )
         return guardada.toResponse(0L)
@@ -76,6 +77,12 @@ class EmpresaService(
             if (otra != null && otra.id != empresa.id) {
                 throw ConflictException("Ya existe una empresa con ese RUC")
             }
+        }
+
+        // Sin uuid en la petición se queda el que tiene.
+        normalizarUuid(request.uuid)?.let {
+            validarUuidLibre(it, empresa.id)
+            empresa.uuid = it
         }
 
         empresa.ruc = ruc
@@ -129,6 +136,27 @@ class EmpresaService(
         return limpio
     }
 
+    /** null si no viene; 400 si no tiene el formato de un UUID. Se guarda en minúsculas, como lo escribe Sulotec. */
+    private fun normalizarUuid(uuid: String?): String? {
+        val limpio = uuid?.trim().orEmpty()
+        if (limpio.isEmpty()) return null
+        if (!UUID_VALIDO.matches(limpio)) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "El UUID no es válido: copia el de la empresa en Sulotec (8-4-4-4-12 caracteres)"
+            )
+        }
+        return limpio.lowercase()
+    }
+
+    // Dos empresas con el mismo UUID compartirían la licencia: no se permite.
+    private fun validarUuidLibre(uuid: String, idPropio: Int?) {
+        val otra = empresaRepository.findByUuid(uuid)
+        if (otra != null && otra.id != idPropio) {
+            throw ConflictException("El UUID ya lo usa la empresa ${otra.nombre}")
+        }
+    }
+
     private fun clave(nombre: String) = nombre.trim().lowercase()
 
     private fun Empresa.toResponse(cuentas: Long) = EmpresaResponse(
@@ -143,6 +171,7 @@ class EmpresaService(
 
     companion object {
         private const val MAX_NOMBRE = 255
+        private val UUID_VALIDO = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
         private val RUC = Regex("^\\d{11}$")
     }
 }

@@ -48,6 +48,10 @@ services:
       ML_API_KEY: ${ML_API_KEY:-dev-internal-key-change-me}
       JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-me-0123456789}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      # Licencias de Sulotec: vacias = apagadas (no se consulta ni se bloquea nada).
+      LICENCIAS_URL: ${LICENCIAS_URL:-}
+      LICENCIAS_TOKEN: ${LICENCIAS_TOKEN:-}
+      LICENCIAS_PRODUCTO: ${LICENCIAS_PRODUCTO:-plaft}
       # Crea el usuario administrador y los catalogos basicos en la base NUEVA (idempotente).
       APP_SEED_ENABLED: "true"
       APP_SEED_ADMIN_USER: ${ADMIN_USER:-superadmin}

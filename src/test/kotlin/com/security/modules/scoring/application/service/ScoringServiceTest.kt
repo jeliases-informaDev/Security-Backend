@@ -1,5 +1,9 @@
 ﻿package com.security.modules.scoring.application.service
 
+import com.security.modules.licencias.ContextoLicencia
+import com.security.modules.licencias.LicenciaContexto
+import com.security.modules.licencias.LicenciaService
+import com.security.modules.licencias.dominio.TIPO_SCORING
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.domain.HistorialMancha
 import com.security.modules.listas.domain.TipoLista
@@ -16,13 +20,18 @@ import com.security.shared.datos.entities.Pais
 import com.security.shared.datos.entities.TipoDocumento
 import com.security.shared.datos.entities.Usuario
 import com.security.shared.datos.repositories.UsuarioRepository
+import com.security.shared.exceptions.ResourceNotFoundException
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.util.Optional
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /**
  * Fijan los puntajes y pesos del libro vigente (Scoring y Factores_Riesgo LAFT, nov-2020):
@@ -37,13 +46,15 @@ class ScoringServiceTest {
     private val departamentoRepository = mockk<ScoringDepartamentoRepository>()
     private val scoringRiesgoRepository = mockk<ScoringRiesgoRepository>()
     private val usuarioRepository = mockk<UsuarioRepository>()
+    private val contexto = mockk<LicenciaContexto>()
+    private val licencias = mockk<LicenciaService>(relaxed = true)
     private lateinit var service: ScoringService
 
     private val peru = Pais(id = 1, nombre = "Peru", continente = "America")
 
     @BeforeEach
     fun setUp() {
-        service = ScoringService(mockk(relaxed = true), entidadRepository, ocupacionRepository, departamentoRepository, scoringRiesgoRepository, usuarioRepository, mockk(relaxed = true))
+        service = ScoringService(entidadRepository, ocupacionRepository, departamentoRepository, scoringRiesgoRepository, usuarioRepository, mockk(relaxed = true), contexto, licencias)
         every { usuarioRepository.findByUsuario("analista") } returns Usuario(id = 1, usuario = "analista", clave = "x", correo = "a@b.c")
         every { scoringRiesgoRepository.save(any<ScoringRiesgo>()) } answers { firstArg<ScoringRiesgo>().also { it.id = 99 } }
     }
@@ -109,5 +120,49 @@ class ScoringServiceTest {
     fun `los pesos suman 100`() {
         val r = evaluar(entidad(), ocupacion = 1, departamento = 1, volumen = "1")
         assertEquals(100, r.factores.sumOf { it.peso })
+    }
+
+    private val quien = ContextoLicencia(usuario = "analista", empresa = "Peru Luz", empresaUuid = "u-1", esSulotec = false)
+
+    private fun licenciasEncendidas() {
+        every { licencias.activo } returns true
+        every { contexto.actual() } returns quien
+    }
+
+    @Test
+    fun `cada evaluacion pide 1 token con una clave nueva`() {
+        licenciasEncendidas()
+        val clave = slot<String>()
+        every { licencias.consumirComo(quien, TIPO_SCORING, capture(clave), any()) } returns Unit
+
+        evaluar(entidad(), ocupacion = 1, departamento = 1, volumen = "1000")
+
+        verify(exactly = 1) { licencias.consumirComo(quien, TIPO_SCORING, any(), any()) }
+        assertTrue(clave.captured.startsWith("plaft:u-1:scoring:"))
+        verify(exactly = 0) { licencias.anular(any()) }
+    }
+
+    @Test
+    fun `si el guardado falla despues de consumir se devuelve el token`() {
+        licenciasEncendidas()
+        val clave = slot<String>()
+        every { licencias.consumirComo(quien, TIPO_SCORING, capture(clave), any()) } returns Unit
+        every { scoringRiesgoRepository.save(any<ScoringRiesgo>()) } throws IllegalStateException("sin base")
+
+        assertFailsWith<IllegalStateException> { evaluar(entidad(), ocupacion = 1, departamento = 1, volumen = "1000") }
+
+        verify(exactly = 1) { licencias.anular(clave.captured) }
+    }
+
+    @Test
+    fun `una entidad que no existe no consume tokens`() {
+        licenciasEncendidas()
+        every { entidadRepository.buscarPorIdConDetalle(1) } returns null
+
+        assertFailsWith<ResourceNotFoundException> {
+            service.evaluar("analista", EvaluarScoringRequest(entidadId = 1, idOcupacion = 1, idDepartamento = 1, volumenTransaccional = BigDecimal.ONE))
+        }
+
+        verify(exactly = 0) { licencias.consumirComo(any(), any(), any(), any()) }
     }
 }

@@ -20,16 +20,12 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.time.LocalDateTime
-import com.security.modules.creditos.application.service.CreditoService
-import com.security.modules.creditos.domain.AccionCredito
 
 
 
 @Service
 
 class CrearDenunciaUseCase(
-    private val creditoService: CreditoService,
-
     private val denunciaRepository:
     DenunciaRepository,
 
@@ -70,9 +66,6 @@ class CrearDenunciaUseCase(
             receptor,
             usuarioCreador
         )
-        usuarioCreador?.let {
-            creditoService.consumir(it, AccionCredito.DENUNCIA_CREAR, "denuncia:nueva")
-        }
 
         // =====================================================
         // GENERAR DATOS DE SEGUIMIENTO

@@ -88,6 +88,14 @@ Luego abre [consultas.sql](consultas.sql) y ejecuta una consulta a la vez.
 
 **Los combos "Ocupación / Profesión" y "Departamento" de la pantalla *Scoring de Riesgo* se llenan con esas dos tablas** (`GET /api/scoring/catalogos`). Si salen vacíos, las tablas están vacías en la base a la que apunta el backend (ver sección 5).
 
+### Licencias
+
+| Tabla | Qué guarda |
+|---|---|
+| `consumos_licencia_pendientes` | Consumos de tokens (y anulaciones) que no llegaron al servicio de licencias de Sulotec porque no respondió; se reintentan cada minuto con la misma clave. Normalmente está vacía. |
+
+La licencia misma no se guarda aquí: vive en el servicio común de Sulotec (ver [LICENCIAS.md](LICENCIAS.md)). `licencias_empresa`, `movimientos_credito`, `tarifas_credito` y `avisos_licencia` son del módulo de créditos que se retiró: quedan sin uso y se pueden borrar a mano después de respaldar.
+
 ### Tablas sin código todavía (módulos pendientes)
 
 Existen en las bases del equipo (se crearon con un script SQL) pero **el backend aún no las usa y una base nueva del compose no las trae**: `accesos_usuario`, `base_programada`, `beneficiarios_operacion`, `canal_denuncias`, `extension_judicial`, `extension_natural`, `galeria`, `membresia`, `monedas`, `notificaciones`, `planes`, `registro_operaciones`, `rol_rutas`, `rutas`, `token`, `tokens_consulta`. Corresponden a los módulos de denuncias, operaciones, cursos y planes.

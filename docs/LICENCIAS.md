@@ -18,17 +18,28 @@ La empresa del servicio es el `uuid` de la empresa en PLAFT (tabla `empresas`). 
 
 El administrador de Sulotec (rol `ADMINISTRADOR`) nunca se bloquea. Si tiene empresa, sus consumos se envían marcados como `hecho_por_sulotec`; si no tiene empresa, no se consume nada.
 
-## Las tres acciones que consumen tokens
+## Las acciones que se avisan a Sulotec
 
-Cada una consume 1 token, y se pide permiso **antes** de hacer la acción:
+**El costo lo decide Sulotec, se cambia en sulotec.com/licencias.** PLAFT no escribe ningún costo: solo avisa qué acción se hizo (`tipo`) y Sulotec aplica su tarifa para ese tipo (puede ser 0). Por compatibilidad PLAFT sigue mandando `cantidad = 1`, que el servicio ignora. La respuesta permitida trae `cobrado` (lo que se descontó) y a veces `sin_descuento: true`; si un servicio viejo no los manda, no pasa nada.
 
-| Acción | Tipo | Clave idempotente |
-|---|---|---|
-| Búsqueda en listas negativas (solo la página 0; pasar de página no consume) | `busqueda_listas` | Misma persona y mismos criterios en una ventana de 2 minutos = misma clave, así un doble clic o recargar no cobra dos veces |
-| Evaluación de scoring | `scoring` | Una nueva por evaluación |
-| Mensaje a Indira | `mensaje_indira` | Una nueva por mensaje |
+Se pide permiso **antes** de hacer la acción:
 
-Nada más consume tokens (ni los PDF, ni las matrices, ni las denuncias, ni las operaciones, ni la búsqueda de personas del ML). Si la acción falla después de consumir, el consumo se anula.
+| Acción | Tipo | Dónde | Clave idempotente |
+|---|---|---|---|
+| Búsqueda en listas negativas (solo la página 0; pasar de página no avisa) | `busqueda_listas` | `ListaNegativaService.buscar` | Misma persona y mismos criterios en una ventana de 2 minutos = misma clave (un doble clic o recargar no cobra dos veces) |
+| Descarga del PDF de una coincidencia (`GET /api/listas-negativas/{id}/pdf`) | `lista_pdf` | `ListaNegativaService.exportarPdf` | Misma persona y misma entidad en 2 minutos = misma clave |
+| Evaluación de scoring ejecutada y guardada | `scoring` | `ScoringService.evaluar` | Una nueva por evaluación |
+| Registrar formalmente una matriz (estado ABIERTO; los borradores no avisan) | `matriz_registrar` | `MatrizRiesgoRegistroService.registrar` | Una nueva por registro |
+| Exportar una matriz a PDF | `matriz_pdf` | `MatrizRiesgoPdfController.exportarPdf` | Misma persona y misma matriz en 2 minutos = misma clave |
+| Registrar una denuncia (solo si la registra una cuenta con empresa) | `denuncia_crear` | `CrearDenunciaUseCase.ejecutar` | Una nueva por denuncia |
+| Subir un lote de archivos a una denuncia (solo si quien sube es una cuenta con empresa) | `denuncia_documentos` | `SubirDocumentosDenunciaUseCase.ejecutar` | Una nueva por lote |
+| Insertar una operación | `operacion_registrar` | `OperacionService.registrar` | Una nueva por registro |
+| Exportar una operación a PDF | `operacion_pdf` | `OperacionPdfController.exportarPdf` | Misma persona y mismo registro en 2 minutos = misma clave |
+| Mensaje a Indira | `mensaje_indira` | `MlService` | Una nueva por mensaje |
+
+Las siete nuevas usan `CobroAcciones` (en `modules/licencias`), con el mismo mecanismo que las tres primeras. Si la acción falla después de avisar, el consumo se anula. Sin licencias, sin sesión o con una cuenta sin empresa con UUID no se avisa nada.
+
+**El canal de denuncias nunca se frena:** Sulotec responde "permitido" para `denuncia_crear` y `denuncia_documentos` aunque no haya saldo, y además PLAFT deja pasar la denuncia aunque Sulotec dijera que no (o aunque la última licencia conocida estuviera bloqueada).
 
 Si el servicio rechaza el consumo: bolsa agotada → **402** `LICENCIA_BOLSA_AGOTADA`; solo lectura → **403** `LICENCIA_SOLO_LECTURA`; suspendida → **403** `LICENCIA_SUSPENDIDA`; cancelada → **403** `LICENCIA_CANCELADA`.
 
@@ -54,7 +65,7 @@ Antes de crear una cuenta, reactivar una inactiva, mover una cuenta activa a otr
 
 ## Lo que ve la web
 
-`GET /api/licencia` (cualquier rol; `?refrescar=1` vuelve a preguntar) responde `exento`, `empresa` y `licencia` (estado, plan, usuarios, vencimiento, periodo, tokens, mensaje y enlace a `https://sulotec.com/mi-licencia`). Con `licencia = null` la web no muestra nada. Los errores 402, 403 y 409 de licencia traen además `code` y `enlace` (y `estado`, o `activos` y `usuarios_max`).
+`GET /api/licencia` (cualquier rol; `?refrescar=1` vuelve a preguntar) responde `exento`, `empresa` y `licencia` (estado, plan, usuarios, vencimiento, periodo, tokens, `tarifas`, mensaje y enlace a `https://sulotec.com/mi-licencia`). `tarifas` es la lista `[{ tipo, nombre, tokens, bloquea }]` tal cual la manda Sulotec (lista vacía si no la manda). Con `licencia = null` la web no muestra nada. Los errores 402, 403 y 409 de licencia traen además `code` y `enlace` (y `estado`, o `activos` y `usuarios_max`). Los errores salen siempre como JSON, también en las descargas de PDF.
 
 ## Tablas
 

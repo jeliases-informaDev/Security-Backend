@@ -1,11 +1,13 @@
 ﻿package com.security.shared.exceptions
 
+import com.security.modules.auth.sso.SsoException
 import com.security.modules.licencias.LicenciaBloqueadaException
 import com.security.modules.licencias.LicenciaBolsaAgotadaException
 import com.security.modules.licencias.LicenciaReglas
 import com.security.modules.licencias.LicenciaSinCupoException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.security.access.AccessDeniedException
@@ -192,6 +194,21 @@ class GlobalExceptionHandler {
         )
     }
 
+    // Inicio único con la cuenta Sulotec: el status y el code los decide SsoReglas (nunca 502/504: Cloudflare los reemplaza)
+    @ExceptionHandler(SsoException::class)
+    fun handleSso(
+        ex: SsoException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = ex.status,
+            message = ex.message ?: "No se pudo entrar con la cuenta Sulotec",
+            request = request,
+            code = ex.code
+        )
+    }
+
     // 402 - La empresa usó todos los tokens del mes, incluida la tolerancia (servicio común de licencias)
     @ExceptionHandler(LicenciaBolsaAgotadaException::class)
     fun handleLicenciaBolsaAgotada(
@@ -280,8 +297,10 @@ class GlobalExceptionHandler {
             usuariosMax = usuariosMax
         )
 
+        // JSON fijo: así el error también llega a quien pidió un PDF (Accept: application/pdf) en vez de un 406.
         return ResponseEntity
             .status(status)
+            .contentType(MediaType.APPLICATION_JSON)
             .body(response)
     }
 }

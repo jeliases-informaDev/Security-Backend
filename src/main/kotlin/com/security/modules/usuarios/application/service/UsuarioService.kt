@@ -1,5 +1,8 @@
 ﻿package com.security.modules.usuarios.application.service
 
+import com.security.modules.auth.sso.CuentaSulotecResponse
+import com.security.modules.auth.sso.CuentasSulotec
+import com.security.modules.auth.sso.InvitacionSulotecResponse
 import com.security.modules.empresas.application.service.EmpresaService
 import com.security.modules.licencias.LicenciaContexto
 import com.security.modules.licencias.LicenciaService
@@ -18,11 +21,15 @@ import com.security.shared.exceptions.ResourceNotFoundException
 import com.security.shared.security.esAdministrador
 import com.security.shared.security.mismaEmpresa
 import com.security.shared.security.usuarioConSigla
+import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
+import java.security.SecureRandom
 import java.time.LocalDateTime
+import java.util.Base64
 
 
 
@@ -35,8 +42,11 @@ class UsuarioService(
     private val passwordEncoder: PasswordEncoder,
     private val empresaService: EmpresaService,
     private val licenciaService: LicenciaService,
-    private val licenciaContexto: LicenciaContexto
+    private val licenciaContexto: LicenciaContexto,
+    private val cuentasSulotec: CuentasSulotec? = null
 ) {
+
+    private val azar = SecureRandom()
 
     fun listar(): List<UsuarioResponse> {
         return usuarioRepository.findAllConRoles().map { it.toResponse() }
@@ -71,14 +81,35 @@ class UsuarioService(
         val rol = rolesRepository.findByCodigo(request.rolCodigo)
             ?: throw ResourceNotFoundException("El rol '${request.rolCodigo}' no existe")
 
+        // Modo Sulotec: la persona entra con su cuenta Sulotec y la clave que mande la web se ignora.
+        val modoSulotec = cuentasSulotec?.modoSulotec(empresaElegida.uuid) == true
+        val claveLocal = if (modoSulotec) {
+            claveAleatoria()
+        } else {
+            request.clave?.takeIf { it.isNotBlank() }
+                ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña es obligatoria")
+        }
+
         // La cuenta nace activa y ocupa un lugar del plan: se pide el cupo a Sulotec antes de guardarla.
         licenciaService.verificarCupo(empresaElegida.uuid, 1, actorEsSulotec)
+
+        // Después del cupo y antes de guardar: si Sulotec no deja la cuenta lista, no se guarda nada.
+        val cuentaSulotec = if (modoSulotec) {
+            cuentasSulotec!!.asegurar(
+                empresaUuid = empresaElegida.uuid!!.trim(),
+                correo = request.correo.trim(),
+                nombre = nombreCompleto(request.nombres, request.apePat, request.apeMat),
+                reinvitar = false
+            )
+        } else {
+            null
+        }
 
         val now = LocalDateTime.now()
 
         val usuario = Usuario(
             usuario = nombreUsuario,
-            clave = passwordEncoder.encode(request.clave)!!,
+            clave = passwordEncoder.encode(claveLocal)!!,
             correo = request.correo,
             nombres = request.nombres,
             apePat = request.apePat,
@@ -97,7 +128,45 @@ class UsuarioService(
         usuarioGuardado.roles = mutableListOf(UsuarioRol(usuario = usuarioGuardado, rol = rol))
         licenciaService.reportarActivosLuego(empresa)
 
-        return usuarioGuardado.toResponse()
+        return usuarioGuardado.toResponse().copy(cuentaSulotec = cuentaSulotec)
+    }
+
+    /**
+     * Vuelve a mandar la invitación de Sulotec (reinvitar = true). Mismos permisos que cambiar el estado: el
+     * administrador de empresa solo sobre cuentas de su empresa. Fuera del modo Sulotec responde 409 CUENTA_SULOTEC_APAGADA.
+     */
+    fun reinvitarSulotec(usuarioId: Int, autenticacion: Authentication): InvitacionSulotecResponse {
+        val usuario = usuarioRepository.findById(usuarioId)
+            .orElseThrow { ResourceNotFoundException("Usuario no encontrado") }
+        comprobarMismaEmpresa(usuario, autenticacion)
+        val uuid = licenciaContexto.uuidDeEmpresa(usuario.empresa)
+        val cuentas = cuentasSulotec
+        if (cuentas == null || uuid == null || !cuentas.modoSulotec(uuid)) throw CuentasSulotec.apagada()
+        val cuenta: CuentaSulotecResponse = cuentas.asegurar(
+            empresaUuid = uuid,
+            correo = usuario.correo.trim(),
+            nombre = nombreCompleto(usuario.nombres, usuario.apePat, usuario.apeMat),
+            reinvitar = true
+        )
+        return InvitacionSulotecResponse(cuenta)
+    }
+
+    private fun comprobarMismaEmpresa(usuario: Usuario, autenticacion: Authentication) {
+        if (autenticacion.esAdministrador()) return
+        val actor = usuarioRepository.findByUsuario(autenticacion.name)
+        if (actor == null || !mismaEmpresa(actor.empresa, usuario.empresa)) {
+            throw ResourceNotFoundException("Usuario no encontrado")
+        }
+    }
+
+    private fun nombreCompleto(vararg partes: String?): String? =
+        partes.mapNotNull { it?.trim()?.takeIf { p -> p.isNotEmpty() } }.joinToString(" ").ifEmpty { null }
+
+    // 32 bytes al azar (43 caracteres, bajo el límite de 72 bytes de BCrypt): nadie la conoce.
+    private fun claveAleatoria(): String {
+        val bytes = ByteArray(32)
+        azar.nextBytes(bytes)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
     @Transactional
@@ -157,12 +226,7 @@ class UsuarioService(
 
         // Un administrador de empresa solo toca cuentas de su propia empresa; una ajena responde como si no existiera.
         val esSulotec = autenticacion.esAdministrador()
-        if (!esSulotec) {
-            val actor = usuarioRepository.findByUsuario(autenticacion.name)
-            if (actor == null || !mismaEmpresa(actor.empresa, usuario.empresa)) {
-                throw ResourceNotFoundException("Usuario no encontrado")
-            }
-        }
+        comprobarMismaEmpresa(usuario, autenticacion)
 
         // Reactivar una cuenta vuelve a ocupar un lugar del plan: se pide el cupo antes.
         if (activo && !usuario.activo) {

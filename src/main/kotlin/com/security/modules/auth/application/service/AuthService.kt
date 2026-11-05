@@ -46,6 +46,15 @@ class AuthService(
             throw BadCredentialsException("Usuario o contraseña incorrectos")
         }
 
+        return respuestaDe(usuario)
+    }
+
+    /**
+     * El token de PLAFT y la respuesta del login para una cuenta ya validada. La usa también el inicio único con la
+     * cuenta Sulotec, para que las dos entradas respondan exactamente lo mismo.
+     */
+    fun respuestaDe(usuario: Usuario): LoginResponse {
+
         val rol = usuario.roles.firstOrNull()?.rol
             ?: throw BadCredentialsException("El usuario no tiene un rol asignado")
 

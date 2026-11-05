@@ -86,6 +86,20 @@ class LicenciaService(
         }
     }
 
+    /**
+     * La licencia preguntada a Sulotec en este momento, SIN caché (la usa el inicio único: una licencia recién creada no
+     * debe verse como "sin licencia" durante 5 minutos). null = licencias apagadas o sin UUID. Si Sulotec no responde
+     * lanza LicenciasNoDisponibleException: quien la usa decide qué decirle a la persona.
+     */
+    fun licenciaEnVivo(uuid: String?): LicenciaRemota? {
+        if (!properties.activo) return null
+        val empresa = limpiar(uuid) ?: return null
+        val licencia = cliente.obtenerLicencia(empresa)
+        cache[empresa] = Entrada(licencia, reloj.instant())
+        pausaHasta.remove(empresa)
+        return licencia
+    }
+
     /** Estado que ya está en caché (aunque haya vencido), sin preguntar nada; null si no se conoce. */
     fun estadoConocido(uuid: String?): String? = limpiar(uuid)?.let { cache[it]?.licencia?.estado }
 
@@ -214,6 +228,10 @@ class LicenciaService(
     fun claveBusqueda(uuid: String?, usuario: String, criterios: List<String?>): String =
         LicenciaReglas.claveBusqueda(uuid, usuario, criterios, reloj.instant())
 
+    /** Clave de una acción que un reintento repetiría (búsqueda, PDF), con el reloj del servicio. */
+    fun claveDeterminista(uuid: String?, usuario: String, tipo: String, criterios: List<String?>): String =
+        LicenciaReglas.claveDeterminista(uuid, usuario, tipo, criterios, reloj.instant())
+
     /** consumir con los datos de quien actúa. Sin contexto o sin empresa no se consume nada. */
     fun consumirComo(contexto: ContextoLicencia?, tipo: String, clave: String, detalle: String?) {
         if (contexto == null) return
@@ -221,7 +239,8 @@ class LicenciaService(
     }
 
     /**
-     * Pide permiso a Sulotec y descuenta 1 token ANTES de ejecutar la acción. Devuelve normalmente si se permite;
+     * Pide permiso a Sulotec ANTES de ejecutar la acción; Sulotec descuenta lo que diga su tarifa para ese tipo (la
+     * cantidad = 1 que se manda solo es por compatibilidad). Devuelve normalmente si se permite;
      * lanza LicenciaBolsaAgotadaException (402) o LicenciaBloqueadaException (403) si el servicio lo rechaza. Si Sulotec
      * no responde se permite y el consumo queda en la cola local con la misma clave, salvo que la última licencia conocida
      * ya estuviera bloqueada. El administrador de Sulotec nunca se bloquea (sus consumos van marcados hecho_por_sulotec).
@@ -246,6 +265,9 @@ class LicenciaService(
             return
         }
         if (respuesta.permitido == true) {
+            if (respuesta.cobrado != null || respuesta.sinDescuento == true) {
+                log.debug("Consumo {} de la empresa {}: Sulotec cobró {} (sin descuento: {})", tipo, empresa, respuesta.cobrado, respuesta.sinDescuento)
+            }
             anotarTokens(empresa, respuesta)
             return
         }

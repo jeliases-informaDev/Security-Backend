@@ -1,5 +1,6 @@
 package com.security.modules.licencias
 
+import com.security.modules.auth.sso.CuentasSulotec
 import com.security.modules.licencias.dominio.LicenciaRespuesta
 import com.security.shared.security.esAdministrador
 import org.slf4j.LoggerFactory
@@ -21,7 +22,8 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/licencia")
 class LicenciaController(
     private val contexto: LicenciaContexto,
-    private val licencias: LicenciaService
+    private val licencias: LicenciaService,
+    private val cuentasSulotec: CuentasSulotec
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -40,10 +42,18 @@ class LicenciaController(
             log.warn("No se pudo leer la licencia de {}: {}", authentication.name, e.message)
             null
         }
+        // Modo Sulotec de la empresa de quien pregunta; el administrador de Sulotec (sin empresa) ve si está encendido.
+        val cuentas = try {
+            if (authentication.esAdministrador()) cuentasSulotec.encendido else cuentasSulotec.modoSulotec(actor?.empresaUuid)
+        } catch (e: Exception) {
+            log.warn("No se pudo saber si {} usa cuentas Sulotec: {}", authentication.name, e.message)
+            false
+        }
         return LicenciaRespuesta(
             exento = authentication.esAdministrador(),
             empresa = actor?.empresa,
-            licencia = licencia
+            licencia = licencia,
+            cuentasSulotec = cuentas
         )
     }
 }

@@ -1,5 +1,8 @@
 ﻿package com.security.modules.denuncias.application.usecase
 
+import com.security.modules.licencias.CobroAcciones
+import com.security.modules.licencias.conCobro
+import com.security.modules.licencias.dominio.TIPO_DENUNCIA_CREAR
 import com.security.modules.denuncias.application.dto.CrearDenunciaRequest
 import com.security.modules.denuncias.application.dto.CrearDenunciaResponse
 import com.security.modules.denuncias.application.service.SeguimientoDenunciaService
@@ -42,7 +45,10 @@ class CrearDenunciaUseCase(
     SeguimientoDenunciaService,
 
     private val autorizacionDenunciaService:
-    AutorizacionDenunciaService
+    AutorizacionDenunciaService,
+
+    private val cobro:
+    CobroAcciones? = null
 ) {
 
     @Transactional
@@ -66,6 +72,30 @@ class CrearDenunciaUseCase(
             receptor,
             usuarioCreador
         )
+
+        // =====================================================
+        // AVISO A SULOTEC
+        // =====================================================
+
+        /*
+         * Solo cuando la registra una cuenta (con empresa con UUID):
+         * el canal público no avisa nada. El canal de denuncias nunca
+         * se frena: si Sulotec dijera que no, se registra igual.
+         */
+        if (usuarioCreador == null) {
+            return registrar(request, receptor, null)
+        }
+
+        return cobro.conCobro(TIPO_DENUNCIA_CREAR, "registro de denuncia", nuncaBloquea = true) {
+            registrar(request, receptor, usuarioCreador)
+        }
+    }
+
+    private fun registrar(
+        request: CrearDenunciaRequest,
+        receptor: Usuario?,
+        usuarioCreador: Usuario?
+    ): CrearDenunciaResponse {
 
         // =====================================================
         // GENERAR DATOS DE SEGUIMIENTO

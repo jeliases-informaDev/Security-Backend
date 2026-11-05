@@ -1,6 +1,7 @@
 package com.security.modules.licencias.cliente
 
 import com.security.modules.licencias.dominio.ConsumoRemoto
+import com.security.modules.licencias.dominio.CuentaRemota
 import com.security.modules.licencias.dominio.CupoRemoto
 import com.security.modules.licencias.dominio.LicenciaRemota
 
@@ -30,6 +31,12 @@ interface LicenciasCliente {
         hechoPorSulotec: Boolean,
         detalle: String?
     ): ConsumoRemoto
+
+    /**
+     * Que la persona tenga cuenta Sulotec en esa empresa (Sulotec la crea y manda la invitación; reinvitar = la vuelve
+     * a mandar). sinLicencia = true si el servicio responde 404 (la empresa no tiene licencia de PLAFT).
+     */
+    fun asegurarCuenta(uuid: String, correo: String, nombre: String?, reinvitar: Boolean): CuentaRemota
 
     /** Devuelve los tokens de un consumo; si el servicio no lo conoce (404) se da por anulado. */
     fun anular(clave: String)

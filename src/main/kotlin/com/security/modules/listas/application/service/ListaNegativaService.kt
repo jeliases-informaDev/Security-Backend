@@ -1,8 +1,10 @@
 package com.security.modules.listas.application.service
 
+import com.security.modules.licencias.CobroAcciones
 import com.security.modules.licencias.LicenciaContexto
 import com.security.modules.licencias.LicenciaService
 import com.security.modules.licencias.dominio.TIPO_BUSQUEDA_LISTAS
+import com.security.modules.licencias.dominio.TIPO_LISTA_PDF
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.domain.HistorialConsulta
 import com.security.modules.listas.dto.HistorialConsultaResponse
@@ -34,6 +36,9 @@ class ListaNegativaService(
     private val licenciaService: LicenciaService,
     private val listaNegativaPdfService: ListaNegativaPdfService = ListaNegativaPdfService()
 ) {
+
+    // Mismo licenciaContexto y licenciaService que la búsqueda: así las pruebas que arman el servicio a mano no cambian.
+    private val cobro = CobroAcciones(licenciaContexto, licenciaService)
 
     companion object {
         const val TAMANO_PAGINA = 20
@@ -186,7 +191,9 @@ class ListaNegativaService(
     }
 
     /**
-     * Exporta el reporte de la entidad consultada a formato PDF. No consume tokens: lo que se cobra es la búsqueda.
+     * Exporta el reporte de la entidad consultada a formato PDF. Se avisa a Sulotec (lista_pdf) recién con la entidad
+     * encontrada; la clave es la misma para la misma persona y la misma entidad durante dos minutos (un reintento de la
+     * descarga no cobra dos veces). Si el PDF no se puede generar, el consumo se anula.
      */
     @Transactional
     fun exportarPdf(username: String, entidadId: Int): ByteArray {
@@ -196,7 +203,9 @@ class ListaNegativaService(
         val entidad = entidadRepository.buscarPorIdConDetalle(entidadId)
             ?: throw ResourceNotFoundException("No se encontró el registro solicitado")
 
-        return listaNegativaPdfService.generar(entidad.toResponse(), username)
+        return cobro.ejecutar(TIPO_LISTA_PDF, "PDF de la coincidencia $entidadId", criterios = listOf(entidadId.toString())) {
+            listaNegativaPdfService.generar(entidad.toResponse(), username)
+        }
     }
 
     private fun Entidad.toResponse(): ResultadoBusquedaResponse {

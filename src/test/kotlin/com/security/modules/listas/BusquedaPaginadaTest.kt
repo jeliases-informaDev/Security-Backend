@@ -85,7 +85,7 @@ class BusquedaPaginadaTest {
     }
 
     @Test
-    fun `exportarPdf entrega el binario PDF con cabeceras y no consume tokens`() {
+    fun `exportarPdf entrega el binario PDF con cabeceras y con licencias apagadas no avisa nada`() {
         val p = persona(42)
         every { entidades.buscarPorIdConDetalle(42) } returns p
 

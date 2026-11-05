@@ -9,9 +9,9 @@ data class UsuarioCreateRequest(
     @field:NotBlank(message = "El usuario es obligatorio")
     val usuario: String,
 
-    @field:NotBlank(message = "La contraseña es obligatoria")
+    // Obligatoria fuera del modo Sulotec (lo revisa UsuarioService); en modo Sulotec se ignora.
     @field:Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
-    val clave: String,
+    val clave: String? = null,
 
     @field:NotBlank(message = "El correo es obligatorio")
     @field:Email(message = "El correo no es válido")

@@ -52,6 +52,9 @@ services:
       LICENCIAS_URL: ${LICENCIAS_URL:-}
       LICENCIAS_TOKEN: ${LICENCIAS_TOKEN:-}
       LICENCIAS_PRODUCTO: ${LICENCIAS_PRODUCTO:-plaft}
+      SSO_ISSUER: ${SSO_ISSUER:-}
+      SSO_CLIENT_ID: ${SSO_CLIENT_ID:-plaft}
+      SSO_REDIRECT_URI: ${SSO_REDIRECT_URI:-}
       # Crea el usuario administrador y los catalogos basicos en la base NUEVA (idempotente).
       APP_SEED_ENABLED: "true"
       APP_SEED_ADMIN_USER: ${ADMIN_USER:-superadmin}

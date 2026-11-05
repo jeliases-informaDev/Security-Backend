@@ -10,6 +10,12 @@ spring:
   application:
     name: security-backend
 
+  # Archivos de hasta 10 MB (sustento del scoring y documentos de denuncias; sin esto Spring corta en 1 MB).
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:30MB}
+
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3307/security_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
     username: ${DB_USER:root}

@@ -14,7 +14,11 @@ class ScoringOcupacion(
     @Column(name = "nombre", nullable = false, unique = true)
     var nombre: String,
 
-    // Puntaje de riesgo 1-5, segun el modelo de scoring de referencia
+    // Puntaje de riesgo 1-5 de la metodologia version 1 (libro de 2020): lo conservan las evaluaciones antiguas
     @Column(name = "puntaje", nullable = false)
-    var puntaje: Int
+    var puntaje: Int,
+
+    // Puntaje 1-4 de la metodologia version 2; null = la ocupacion no tiene puntaje y elegirla bloquea el calculo
+    @Column(name = "puntaje_v2")
+    var puntajeV2: Int? = null
 )

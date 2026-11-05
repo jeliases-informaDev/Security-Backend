@@ -1,0 +1,8 @@
+nombre;puntaje;pide_origen_fondos
+Tarjeta de crédito o débito;1;no
+Crédito o financiamiento bancario;1;no
+Transferencia bancaria;2;no
+Cheque de gerencia;2;no
+Efectivo;3;si
+Pago de un tercero;4;no
+Criptoactivos;4;no

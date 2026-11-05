@@ -130,6 +130,7 @@ class ScoringPdfService {
                 lienzo.dato("Parientes y empresas vinculadas a un PEP", coincidencias(q.vinculados))
                 lienzo.dato("Sanciones y listas LA/FT", coincidencias(q.sanciones))
                 lienzo.dato("Noticias y medios", coincidencias(q.noticias))
+                q.homonimo?.let { lienzo.dato("Homónimo", it.texto) }
                 lienzo.y -= 6f
             }
 

@@ -1,0 +1,91 @@
+{
+  "_leeme": "Valores iniciales de las reglas de Listas Negativas (ver docs/LISTAS-NEGATIVAS.md). Al arrancar se crean en la base SOLO los que faltan (por codigo); despues se cambian en las tablas listas_grupo_peso, listas_regla, listas_regla_origen y listas_regla_otras, no aqui. tiposConsulta y tiposDocumento se leen de este archivo.",
+  "gruposPeso": [
+    { "codigo": "CRITICA", "nombre": "Críticas", "peso": 15, "orden": 1, "critica": true },
+    { "codigo": "ALTA", "nombre": "Altas", "peso": 10, "orden": 2, "critica": false },
+    { "codigo": "INFORMATIVA", "nombre": "Informativas", "peso": 5, "orden": 3, "critica": false },
+    { "codigo": "SIN_PESO", "nombre": "Sin peso", "peso": 0, "orden": 4, "critica": false }
+  ],
+  "filas": [
+    {
+      "codigo": "PEP_PERU", "orden": 1, "nombre": "PEP · Perú", "subtitulo": "BASE VIGENTE",
+      "fuente": "PEP", "fuenteNombre": "PEP · Perú", "grupoPeso": "ALTA", "estado": "CONSULTABLE",
+      "todasPep": true, "listas": [], "tipoConteo": "REGISTROS", "etiquetaAviso": "PEP", "etiquetaSuma": "PEP"
+    },
+    {
+      "codigo": "SUNAT", "orden": 2, "nombre": "SUNAT", "subtitulo": "DATOS DEL CONTRIBUYENTE",
+      "fuente": "SUNAT", "fuenteNombre": "SUNAT", "grupoPeso": "SIN_PESO", "estado": "PRONTO",
+      "motivoPronto": "No hay una fuente de datos del contribuyente (RUC, nombre y actividad económica).",
+      "todasPep": false, "listas": [], "tipoConteo": "REGISTROS", "etiquetaAviso": "SUNAT", "etiquetaSuma": "SUNAT"
+    },
+    {
+      "codigo": "ONU_1267", "orden": 3, "nombre": "ONU · Res. 1267", "subtitulo": "TERRORISMO",
+      "fuente": "ONU", "fuenteNombre": "ONU", "grupoPeso": "CRITICA", "estado": "CONSULTABLE",
+      "todasPep": false, "listas": ["Internacional - Consejo de Seguridad ONU"],
+      "tipoConteo": "REGISTROS", "etiquetaAviso": "ONU", "etiquetaSuma": "ONU 1267"
+    },
+    {
+      "codigo": "OFAC", "orden": 4, "nombre": "OFAC", "subtitulo": "ESTADOS UNIDOS",
+      "fuente": "OFAC", "fuenteNombre": "OFAC", "grupoPeso": "CRITICA", "estado": "CONSULTABLE",
+      "todasPep": false, "listas": ["Lista OFAC"],
+      "tipoConteo": "REGISTROS", "etiquetaAviso": "OFAC", "etiquetaSuma": "OFAC"
+    },
+    {
+      "codigo": "UNION_EUROPEA", "orden": 5, "nombre": "Unión Europea", "subtitulo": "TERRORISMO",
+      "fuente": "UE", "fuenteNombre": "Unión Europea", "grupoPeso": "CRITICA", "estado": "CONSULTABLE",
+      "todasPep": false, "listas": ["Internacional - Sanciones de la Unión Europea"],
+      "tipoConteo": "REGISTROS", "etiquetaAviso": "Unión Europea", "etiquetaSuma": "Unión Europea"
+    },
+    {
+      "codigo": "ONU_1718_1737", "orden": 6, "nombre": "ONU · 1718 y 1737", "subtitulo": "PROLIFERACIÓN",
+      "fuente": "ONU", "fuenteNombre": "ONU", "grupoPeso": "CRITICA", "estado": "PRONTO",
+      "motivoPronto": "La lista del Consejo de Seguridad cargada no separa los regímenes 1718 y 1737.",
+      "todasPep": false, "listas": [], "tipoConteo": "REGISTROS", "etiquetaAviso": "ONU", "etiquetaSuma": "ONU 1718/1737"
+    },
+    {
+      "codigo": "ASBANC_INVESTIGADOS", "orden": 7, "nombre": "ASBANC · Investigados", "subtitulo": "LA/FT",
+      "fuente": "ASBANC", "fuenteNombre": "ASBANC", "grupoPeso": "ALTA", "estado": "CONSULTABLE",
+      "todasPep": false, "listas": ["ASBANC - Investigados"],
+      "tipoConteo": "REGISTROS", "etiquetaAviso": "Lista de investigados", "etiquetaSuma": "investigados"
+    },
+    {
+      "codigo": "ASBANC_NOTICIAS", "orden": 8, "nombre": "ASBANC · Noticias", "subtitulo": "INFORMACIÓN NEGATIVA",
+      "fuente": "ASBANC", "fuenteNombre": "ASBANC", "grupoPeso": "INFORMATIVA", "estado": "CONSULTABLE",
+      "todasPep": false, "listas": ["ASBANC - Noticias (información negativa)"],
+      "tipoConteo": "NOTAS", "etiquetaAviso": "Noticias negativas", "etiquetaSuma": "noticias"
+    },
+    {
+      "codigo": "GAFI", "orden": 9, "nombre": "GAFI", "subtitulo": "PAÍSES DE ALTO RIESGO",
+      "fuente": "GAFI", "fuenteNombre": "GAFI", "grupoPeso": "ALTA", "estado": "PRONTO",
+      "motivoPronto": "El GAFI publica países, no personas, y la consulta no pide el país de la persona.",
+      "todasPep": false, "listas": [], "tipoConteo": "REGISTROS", "etiquetaAviso": "GAFI", "etiquetaSuma": "GAFI"
+    },
+    {
+      "codigo": "NOTICIAS_MEDIOS", "orden": 10, "nombre": "Noticias en medios", "subtitulo": "NOTICIAS DE PRENSA",
+      "fuente": "NOTICIAS", "fuenteNombre": "Noticias", "grupoPeso": "INFORMATIVA", "estado": "CONSULTABLE",
+      "todasPep": false, "listas": ["Noticias"],
+      "tipoConteo": "NOTICIAS", "etiquetaAviso": "Noticias negativas", "etiquetaSuma": "noticias"
+    }
+  ],
+  "otras": [
+    { "ordenGrupo": 1, "grupoPeso": "CRITICA" },
+    { "ordenGrupo": 2, "grupoPeso": "ALTA" },
+    { "ordenGrupo": 3, "grupoPeso": "ALTA" },
+    { "ordenGrupo": 4, "grupoPeso": "INFORMATIVA" },
+    { "ordenGrupo": 5, "grupoPeso": "INFORMATIVA" },
+    { "ordenGrupo": 6, "grupoPeso": "INFORMATIVA" }
+  ],
+  "tiposDocumento": [
+    { "codigo": "DNI", "nombre": "DNI", "patron": "^[0-9]{8}$", "ayuda": "El DNI tiene 8 dígitos." },
+    { "codigo": "CE", "nombre": "CE (carné de extranjería)", "patron": "^[A-Za-z0-9]{6,12}$", "ayuda": "El carné de extranjería tiene de 6 a 12 letras o números." },
+    { "codigo": "PASAPORTE", "nombre": "PASAPORTE", "patron": "^[A-Za-z0-9]{5,12}$", "ayuda": "El pasaporte tiene de 5 a 12 letras o números." },
+    { "codigo": "RUC", "nombre": "RUC", "patron": "^[0-9]{11}$", "ayuda": "El RUC tiene 11 dígitos." }
+  ],
+  "tipoDocumentoInicial": "DNI",
+  "tiposConsulta": [
+    { "codigo": "CLIENTE", "nombre": "Cliente", "tiposDocumento": ["DNI", "CE", "PASAPORTE", "RUC"] },
+    { "codigo": "PROVEEDOR", "nombre": "Proveedor", "tiposDocumento": ["DNI", "CE", "PASAPORTE", "RUC"] },
+    { "codigo": "TRABAJADOR_DIRECTOR", "nombre": "Trabajador o director", "tiposDocumento": ["DNI", "CE", "PASAPORTE"] }
+  ],
+  "tipoConsultaInicial": "CLIENTE"
+}

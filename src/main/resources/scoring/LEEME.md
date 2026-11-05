@@ -14,7 +14,9 @@ Separador `;`, primera fila de encabezado, UTF-8.
 | `paises.csv` | `nombre;grupo;alto_riesgo_gafi;vigencia;otros_nombres` | clasificacion inicial al 2026-10-30 (plenario del GAFI de octubre de 2026). `*` = todos los demas paises (grupo 3). `otros_nombres` separados por barra vertical para emparejar con la tabla `pais`. |
 
 Como se empareja: por nombre sin tildes, sin mayusculas y sin espacios (`EMPRESARIO EXPORTADOR/ EMPRESA` = `EMPRESARIO EXPORTADOR/EMPRESA`).
-Los paises **no se crean**: si un pais del archivo no esta en la tabla `pais`, el log lo avisa. Una fila de `paises.csv` con
+Antes de clasificar, la tabla `pais` se completa con `paises-iso.csv` (`alfa2,alfa3,numerico,nombre_es`, 250 paises, el mismo
+catalogo ISO que usa la carga de listas en Sulotec-infra): se agregan los que faltan por nombre normalizado, sin tocar ni borrar
+los que ya estan. Si un pais de `paises.csv` igual no aparece en la tabla, el log lo avisa. Una fila de `paises.csv` con
 `vigencia` mas nueva que la guardada reemplaza a la guardada (asi se actualiza la lista del GAFI).
 
 **Pendiente:** el libro corta los nombres a 30 caracteres (p. ej. `DERECHO DE LAS CIENCIAS ECONOM`). Se dejaron tal cual; cualquier

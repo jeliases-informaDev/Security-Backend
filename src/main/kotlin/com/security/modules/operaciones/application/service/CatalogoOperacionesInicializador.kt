@@ -11,6 +11,8 @@ import org.springframework.boot.ApplicationRunner
 import org.springframework.core.annotation.Order
 import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Component
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 
 /**
  * Al arrancar, deja llenos los combos "Moneda" y "Provincia" del Registro de Operaciones. Una base nueva
@@ -27,17 +29,27 @@ import org.springframework.stereotype.Component
 class CatalogoOperacionesInicializador(
     private val monedaRepository: MonedaRepository,
     private val provinciaRepository: ProvinciaRepository,
-    private val departamentoRepository: ScoringDepartamentoRepository
+    private val departamentoRepository: ScoringDepartamentoRepository,
+    transactionManager: PlatformTransactionManager
 ) : ApplicationRunner {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
+    // Todo dentro de una transaccion: con provincias ya guardadas se lee el nombre de su departamento, que es
+    // perezoso, y fuera de una sesion fallaba ("Could not initialize proxy ... no session").
+    private val tx = TransactionTemplate(transactionManager)
+
     override fun run(args: ApplicationArguments) {
+        // Cada catalogo en su transaccion: si uno falla, el otro igual queda.
         try {
-            sembrarMonedas()
-            sembrarProvincias(leerProvincias())
+            tx.executeWithoutResult { sembrarMonedas() }
         } catch (e: Exception) {
-            log.warn("No se pudieron preparar las monedas y provincias de Operaciones: {}", e.message)
+            log.warn("No se pudieron preparar las monedas de Operaciones: {}", e.message)
+        }
+        try {
+            tx.executeWithoutResult { sembrarProvincias(leerProvincias()) }
+        } catch (e: Exception) {
+            log.warn("No se pudieron preparar las provincias de Operaciones: {}", e.message)
         }
     }
 

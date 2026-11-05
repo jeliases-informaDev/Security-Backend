@@ -1,5 +1,6 @@
 ﻿package com.security.modules.usuarios.controller.infraestructure
 
+import com.security.modules.auth.sso.InvitacionSulotecResponse
 import com.security.modules.usuarios.application.service.CargaMasivaService
 import com.security.modules.usuarios.application.service.UsuarioService
 import com.security.modules.usuarios.dto.CargaMasivaRequest
@@ -91,6 +92,13 @@ class UsuarioController(
     @PostMapping("/{id}/invitar")
     fun invitar(@PathVariable id: Int): ResponseEntity<InvitacionResponse> {
         return ResponseEntity.ok(cargaMasivaService.invitar(id))
+    }
+
+    // Vuelve a mandar la invitación de la cuenta Sulotec (solo en modo Sulotec; el servicio revisa la empresa).
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA')")
+    @PostMapping("/{id}/invitacion")
+    fun invitacionSulotec(@PathVariable id: Int, authentication: Authentication): ResponseEntity<InvitacionSulotecResponse> {
+        return ResponseEntity.ok(usuarioService.reinvitarSulotec(id, authentication))
     }
 
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA')")

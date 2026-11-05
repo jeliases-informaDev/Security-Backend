@@ -130,6 +130,29 @@ data class ConsumoSolicitud(
     val detalle: String?
 )
 
+/** Cuerpo de POST /v1/licencias/{uuid}/cuentas: que la persona tenga cuenta Sulotec en esa empresa (y su invitación). */
+data class CuentaSolicitud(
+    val correo: String,
+    val nombre: String?,
+    val reinvitar: Boolean
+)
+
+/**
+ * Respuesta de POST /v1/licencias/{uuid}/cuentas. estado: creada, existente, otra_empresa, sin_empresa, sin_keycloak
+ * o error; invitacion: correo, clave_temporal o ninguna. sinLicencia = true cuando respondió 404 (sin licencia de PLAFT).
+ * clave_temporal solo se devuelve a quien creó la cuenta: nunca se guarda ni se escribe en el log (por eso toString la oculta).
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class CuentaRemota(
+    val estado: String? = null,
+    val invitacion: String? = null,
+    @JsonProperty("clave_temporal") val claveTemporal: String? = null,
+    val mensaje: String? = null,
+    @JsonProperty("sin_licencia") val sinLicencia: Boolean = false
+) {
+    override fun toString(): String = "CuentaRemota(estado=$estado, invitacion=$invitacion, sinLicencia=$sinLicencia)"
+}
+
 /** Cuerpo de PUT /v1/licencias/{uuid}/usuarios-activos. */
 data class ActivosSolicitud(val activos: Long)
 
@@ -154,5 +177,7 @@ data class LicenciaPublica(
 data class LicenciaRespuesta(
     val exento: Boolean,
     val empresa: String?,
-    val licencia: LicenciaPublica?
+    val licencia: LicenciaPublica?,
+    // La empresa de quien pregunta está en modo Sulotec (sus cuentas se crean en Sulotec y entran con la cuenta Sulotec).
+    val cuentasSulotec: Boolean = false
 )

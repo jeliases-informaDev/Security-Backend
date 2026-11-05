@@ -61,3 +61,23 @@ Las reglas están en `SsoReglas.decidir` (sin red ni base, con pruebas en `SsoRe
 - Queda en el log (`Inicio único: alta automática de ...`); PLAFT no tiene una tabla de auditoría.
 
 El administrador universal que se crea solo tampoco pasa por el cupo (no tiene empresa).
+
+## Los demás usuarios también entran con la cuenta Sulotec (modo Sulotec)
+
+Decisión del dueño (2026-11-05): todos los usuarios de una empresa entran con su cuenta Sulotec y ninguna contraseña nueva vive en PLAFT. El titular (o el administrador de Sulotec) los agrega desde PLAFT eligiendo el rol; Sulotec crea la cuenta y manda la invitación.
+
+**Modo Sulotec de una empresa** = inicio único activo + licencias activas + la empresa tiene licencia en Sulotec (si su licencia nunca se pudo leer porque Sulotec no responde, se toma como modo Sulotec: el alta responde 424 hasta que vuelva, y nunca se guarda una clave por una caída). Fuera de ese modo todo sigue igual que antes: la clave es obligatoria.
+
+Alta (`POST /api/usuarios`) en modo Sulotec:
+- `clave` no es obligatoria y se ignora: se guarda una contraseña aleatoria larga que nadie conoce.
+- Orden: control de cupo → `POST /v1/licencias/{uuid}/cuentas` del servicio de licencias (`{ correo, nombre, reinvitar: false }`) → guardar → reportar activos.
+- `creada` o `existente` → se guarda. `otra_empresa` → 409 `CUENTA_SULOTEC_OTRA_EMPRESA` (mensaje de Sulotec). `sin_empresa` → 409 `CUENTA_SULOTEC_SIN_EMPRESA`. `error`, `sin_keycloak`, 404 sin licencia o Sulotec sin responder → 424 `CUENTA_SULOTEC_NO_DISPONIBLE` («No se pudo crear la cuenta en Sulotec; inténtalo en unos minutos»). En esos casos no se guarda nada.
+- La respuesta agrega `cuentaSulotec: { estado, invitacion, mensaje, claveTemporal }` (null fuera del modo Sulotec). La clave temporal solo se devuelve: no se guarda ni se escribe en el log.
+
+`POST /api/usuarios/{id}/invitacion` vuelve a invitar (`reinvitar: true`) y responde `{ cuentaSulotec }`. Mismos permisos que cambiar el estado (el administrador de empresa solo sobre su empresa). Fuera del modo Sulotec → 409 `CUENTA_SULOTEC_APAGADA`.
+
+Carga masiva (`POST /api/usuarios/carga-masiva`) en modo Sulotec: por ahora responde 409 `CUENTA_SULOTEC_CARGA_MASIVA` («Con cuentas Sulotec, agrega las cuentas una por una»). Fuera del modo Sulotec funciona como antes.
+
+`GET /api/licencia` trae en la raíz `cuentasSulotec` (booleano): la empresa de quien pregunta está en modo Sulotec; para el administrador de Sulotec, que no tiene empresa, vale `true` si el inicio único y las licencias están activos.
+
+El login con usuario y contraseña no cambia: las cuentas antiguas siguen entrando con su clave.

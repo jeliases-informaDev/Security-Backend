@@ -1,6 +1,8 @@
 ﻿package com.security.modules.usuarios.application.service
 
 import com.security.modules.auth.application.service.NotificationService
+import com.security.modules.auth.sso.CuentasSulotec
+import com.security.modules.auth.sso.SsoException
 import com.security.modules.auth.application.service.PasswordResetService
 import com.security.modules.empresas.application.service.EmpresaService
 import com.security.modules.licencias.LicenciaService
@@ -46,7 +48,8 @@ class CargaMasivaService(
     private val empresaService: EmpresaService,
     private val passwordResetService: PasswordResetService,
     private val notificationService: NotificationService,
-    private val licenciaService: LicenciaService
+    private val licenciaService: LicenciaService,
+    private val cuentasSulotec: CuentasSulotec? = null
 ) {
 
     private val log = LoggerFactory.getLogger(CargaMasivaService::class.java)
@@ -58,6 +61,13 @@ class CargaMasivaService(
     @Transactional
     fun cargar(request: CargaMasivaRequest, actorEsSulotec: Boolean = false): CargaMasivaResponse {
         val empresa = empresaService.resolverEmpresaActiva(request.empresa)
+        // Con cuentas Sulotec cada alta pasa por Sulotec: por ahora una por una (ver docs/INICIO-UNICO.md).
+        if (cuentasSulotec?.modoSulotec(empresa.uuid) == true) {
+            throw SsoException(
+                HttpStatus.CONFLICT, CuentasSulotec.CODE_CARGA_MASIVA,
+                "Con cuentas Sulotec, agrega las cuentas una por una (Usuarios, Nuevo usuario)."
+            )
+        }
         val sigla = empresa.sigla
             ?: throw ResponseStatusException(HttpStatus.CONFLICT, "La empresa ${empresa.nombre} no tiene sigla; vuelve a desplegar o corrígela en Empresas")
         val roles = rolesRepository.findAll().filter { it.activo }.associateBy { it.codigo.trim().uppercase() }

@@ -4,6 +4,8 @@ import com.security.modules.licencias.config.LicenciasProperties
 import com.security.modules.licencias.dominio.ActivosSolicitud
 import com.security.modules.licencias.dominio.ConsumoRemoto
 import com.security.modules.licencias.dominio.ConsumoSolicitud
+import com.security.modules.licencias.dominio.CuentaRemota
+import com.security.modules.licencias.dominio.CuentaSolicitud
 import com.security.modules.licencias.dominio.CupoRemoto
 import com.security.modules.licencias.dominio.ESTADO_SIN_LICENCIA
 import com.security.modules.licencias.dominio.LicenciaRemota
@@ -108,6 +110,16 @@ class LicenciasClienteHttp(private val properties: LicenciasProperties) : Licenc
         }
         return respuesta
     }
+
+    override fun asegurarCuenta(uuid: String, correo: String, nombre: String?, reinvitar: Boolean): CuentaRemota =
+        llamar(operacion = "cuentas", si404 = { CuentaRemota(estado = ESTADO_SIN_LICENCIA, sinLicencia = true) }) {
+            cliente.post()
+                .uri("/v1/licencias/{uuid}/cuentas", uuid)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(CuentaSolicitud(correo, nombre, reinvitar))
+                .retrieve()
+                .body(CuentaRemota::class.java)
+        }
 
     override fun anular(clave: String) {
         // Un 404 es que el servicio no tiene ese consumo: no hay nada que devolver.

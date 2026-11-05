@@ -1,3 +1,5 @@
+-- NOTA (2026-11-05): ya no hace falta. Desde la metodologia version 2 los catalogos del scoring se cargan solos al
+-- arrancar (ScoringCatalogoInicializador), tambien sin APP_SEED_ENABLED. Ver docs/SCORING.md. Se conserva como historia.
 -- =====================================================================================
 -- Catalogos del SCORING de riesgo: ocupaciones y departamentos (con su puntaje 1-5).
 -- Fuente: libro vigente "Scoring y Factores_Riesgo LAFT" (nov-2020). Los mismos valores estan en

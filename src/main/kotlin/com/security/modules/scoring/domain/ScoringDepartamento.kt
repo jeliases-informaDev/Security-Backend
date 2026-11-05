@@ -21,7 +21,11 @@ class ScoringDepartamento(
     @Column(name = "nombre", nullable = false)
     var nombre: String,
 
-    // Puntaje de riesgo 1-5
+    // Puntaje de riesgo 1-5 de la metodologia version 1 (libro de 2020)
     @Column(name = "puntaje", nullable = false)
-    var puntaje: Int
+    var puntaje: Int,
+
+    // Puntaje 1-4 de la metodologia version 2; null = sin puntaje (bloquea el calculo)
+    @Column(name = "puntaje_v2")
+    var puntajeV2: Int? = null
 )

@@ -1,5 +1,7 @@
 ﻿package com.security.modules.denuncias.application.usecase
 
+import com.security.modules.licencias.CobroAcciones
+import com.security.modules.licencias.dominio.TIPO_DENUNCIA_DOCUMENTOS
 import com.security.modules.denuncias.application.dto.DenunciaArchivoResponse
 import com.security.modules.denuncias.application.port.ArchivoStorageService
 import com.security.modules.denuncias.application.service.SeguimientoDenunciaService
@@ -31,7 +33,10 @@ class SubirDocumentosDenunciaUseCase(
     ValidadorDocumentoDenunciaService,
 
     private val archivoStorageService:
-    ArchivoStorageService
+    ArchivoStorageService,
+
+    private val cobro:
+    CobroAcciones
 ) {
 
     companion object {
@@ -150,6 +155,27 @@ class SubirDocumentosDenunciaUseCase(
         // =====================================================
         // GUARDAR
         // =====================================================
+
+        /*
+         * Se avisa a Sulotec una vez por lote (denuncia_documentos),
+         * solo si quien sube es una cuenta con empresa con UUID.
+         * El canal de denuncias nunca se frena; si el guardado falla,
+         * el consumo se anula.
+         */
+        return cobro.ejecutar(
+            TIPO_DENUNCIA_DOCUMENTOS,
+            "documentos de la denuncia $codigoNormalizado",
+            nuncaBloquea = true
+        ) {
+            guardarArchivos(denuncia, codigoNormalizado, archivos)
+        }
+    }
+
+    private fun guardarArchivos(
+        denuncia: com.security.modules.denuncias.infrastructure.persistence.entity.DenunciaEntity,
+        codigoNormalizado: String,
+        archivos: List<MultipartFile>
+    ): List<DenunciaArchivoResponse> {
 
         val rutasGuardadas =
             mutableListOf<String>()

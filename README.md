@@ -56,7 +56,7 @@ Levanta el repositorio **Security-MachineLearning** (`docker compose up -d --bui
 
 ## 🎫 Licencias
 
-PLAFT no lleva licencias propias: pregunta al servicio común de licencias de Sulotec, que es la única verdad. Solo consumen tokens la búsqueda en listas, el scoring y los mensajes a Indira. Todo está en **[docs/LICENCIAS.md](docs/LICENCIAS.md)**. Sin `LICENCIAS_URL` y `LICENCIAS_TOKEN` las licencias están apagadas.
+PLAFT no lleva licencias propias: pregunta al servicio común de licencias de Sulotec, que es la única verdad. PLAFT avisa a Sulotec 10 acciones (búsqueda y PDF de listas, scoring, registro y PDF de matrices, denuncias y sus documentos, registro y PDF de operaciones, Indira) y el costo de cada una lo decide Sulotec. Todo está en **[docs/LICENCIAS.md](docs/LICENCIAS.md)**. Se entra también con la cuenta Sulotec: ver **[docs/INICIO-UNICO.md](docs/INICIO-UNICO.md)**. Sin `LICENCIAS_URL` y `LICENCIAS_TOKEN` las licencias están apagadas.
 
 ## ⚙️ Configuración (todo opcional)
 
@@ -69,6 +69,7 @@ Los valores por defecto funcionan. Para cambiarlos copia `.env.example` como `.e
 | `ML_BASE_URL`, `ML_API_KEY`, `ML_PORT` | Microservicio de ML | `http://localhost:8000`, `dev-internal-key-change-me` |
 | `JWT_SECRET` | Firma de los tokens (mín. 32 caracteres) | clave fija solo de desarrollo |
 | `LICENCIAS_URL`, `LICENCIAS_TOKEN`, `LICENCIAS_PRODUCTO` | Servicio común de licencias de Sulotec (vacías = apagado; ver [docs/LICENCIAS.md](docs/LICENCIAS.md)) | vacías, `plaft` |
+| `SSO_ISSUER`, `SSO_CLIENT_ID`, `SSO_REDIRECT_URI` | Inicio único con la cuenta Sulotec (emisor vacío = apagado; ver [docs/INICIO-UNICO.md](docs/INICIO-UNICO.md)) | vacío, `plaft`, vacío |
 | `CORS_ALLOWED_ORIGINS` | Origen(es) del frontend, separados por coma | `http://localhost:3000` |
 | `APP_SEED_ENABLED` | Crea el usuario `superadmin`, los roles y los catálogos (incluidos los de **scoring**) en una base **nueva** | `true` en el compose |
 

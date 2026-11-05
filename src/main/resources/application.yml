@@ -42,6 +42,14 @@ licencias:
   cache-segundos: 300
   pausa-tras-fallo-segundos: 30
 
+# Inicio unico con la cuenta Sulotec (Keycloak). Con SSO_ISSUER vacio esta apagado: nada falla y solo hay login local.
+# Ver docs/INICIO-UNICO.md.
+sso:
+  issuer: ${SSO_ISSUER:}
+  client-id: ${SSO_CLIENT_ID:plaft}
+  redirect-uri: ${SSO_REDIRECT_URI:}
+  timeout-segundos: 8
+
 # Firma de los tokens JWT (minimo 32 caracteres). En un entorno real define JWT_SECRET.
 jwt:
   secret: ${JWT_SECRET:CLAVE-TEMPORAL-SOLO-PARA-DESARROLLO-123456789}

@@ -194,7 +194,8 @@ object LicenciaReglas {
             periodo = licencia.periodo,
             tokens = licencia.tokens,
             mensaje = mensaje,
-            enlace = ENLACE_MI_LICENCIA
+            enlace = ENLACE_MI_LICENCIA,
+            tarifas = licencia.tarifas.orEmpty()
         )
     }
 
@@ -206,21 +207,28 @@ object LicenciaReglas {
 
     // ---------- Claves idempotentes (P4) ----------
 
-    /** Scoring e Indira: cada petición es una acción nueva. */
+    /** Scoring, Indira y los registros: cada petición es una acción nueva. */
     fun claveAleatoria(uuid: String?, tipo: String): String = "plaft:${uuid ?: "sin-empresa"}:$tipo:${UUID.randomUUID()}"
 
     /**
      * Búsqueda en listas: la misma persona con los mismos criterios dentro de la misma ventana de dos minutos da la
      * misma clave, así un doble clic o recargar la búsqueda no cobra dos veces.
      */
-    fun claveBusqueda(uuid: String?, usuario: String, criterios: List<String?>, ahora: Instant): String {
+    fun claveBusqueda(uuid: String?, usuario: String, criterios: List<String?>, ahora: Instant): String =
+        claveDeterminista(uuid, usuario, TIPO_BUSQUEDA_LISTAS, criterios, ahora)
+
+    /**
+     * Acciones que un reintento del navegador repetiría tal cual (la búsqueda y las descargas de PDF): la misma persona,
+     * la misma acción y los mismos datos dentro de la misma ventana de dos minutos dan la misma clave.
+     */
+    fun claveDeterminista(uuid: String?, usuario: String, tipo: String, criterios: List<String?>, ahora: Instant): String {
         val texto = (listOf(usuario) + criterios).joinToString("|") { normalizarCriterio(it) }
         val hash = MessageDigest.getInstance("SHA-256")
             .digest(texto.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
             .take(32)
         val ventana = ahora.epochSecond / 60 / 2
-        return "plaft:${uuid ?: "sin-empresa"}:$TIPO_BUSQUEDA_LISTAS:$hash:$ventana"
+        return "plaft:${uuid ?: "sin-empresa"}:$tipo:$hash:$ventana"
     }
 
     private fun normalizarCriterio(valor: String?): String =

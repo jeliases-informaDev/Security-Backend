@@ -1,5 +1,8 @@
 ﻿package com.security.modules.operaciones.application.service
 
+import com.security.modules.licencias.CobroAcciones
+import com.security.modules.licencias.conCobro
+import com.security.modules.licencias.dominio.TIPO_OPERACION_REGISTRAR
 import com.security.modules.operaciones.dto.RegistrarOperacionResponse
 import com.security.modules.operaciones.dto.ListarOperacionesResponse
 import com.security.modules.operaciones.dto.MostrarUsuarioResponse
@@ -24,7 +27,8 @@ import com.security.shared.datos.entities.Usuario
 
 class OperacionService(
     private val operacionRepository: OperacionRepository,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val cobro: CobroAcciones? = null
 ) {
 
     private fun empresaActual(username: String): String {
@@ -123,7 +127,8 @@ class OperacionService(
         }
         // El registro queda en la empresa actual de la cuenta duena (no en el texto que mande el cliente).
         val empresa = usuario.empresa?.trim()?.takeIf { it.isNotEmpty() } ?: request.registro.empresa
-        val guardado = operacionRepository.saveAndFlush(RegistroOperacionesEntity(
+        // Se avisa a Sulotec (operacion_registrar) con los datos ya validados; si el guardado falla, se anula.
+        val guardado = cobro.conCobro(TIPO_OPERACION_REGISTRAR, "registro de operacion") { operacionRepository.saveAndFlush(RegistroOperacionesEntity(
             numeroRegistro = request.numeroRegistro.trim(),
             idUsuario = usuario.id,
             empresa = empresa,
@@ -141,7 +146,7 @@ class OperacionService(
                 BeneficiarioEntity(nombre = it.nombre, tipoDocumento = it.tipoDocumento,
                     numeroDocumento = it.numeroDocumento, fechaNacimiento = it.fechaNacimiento)
             }
-        ))
+        )) }
         return RegistrarOperacionResponse(
             id = requireNotNull(guardado.id) { "No se genero el ID del registro" },
             numeroRegistro = requireNotNull(guardado.numeroRegistro)

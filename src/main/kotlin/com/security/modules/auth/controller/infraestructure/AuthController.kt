@@ -8,6 +8,9 @@ import com.security.modules.auth.dto.LoginResponse
 import com.security.modules.auth.dto.MessageResponse
 import com.security.modules.auth.dto.ResetPasswordRequest
 import com.security.modules.auth.dto.UsuarioLoginResponse
+import com.security.modules.auth.sso.SsoConfigResponse
+import com.security.modules.auth.sso.SsoLoginRequest
+import com.security.modules.auth.sso.SsoService
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
@@ -18,7 +21,8 @@ import jakarta.validation.Valid
 @RequestMapping("/api/auth")
 class AuthController(
     private val authService: AuthService,
-    private val passwordResetService: PasswordResetService
+    private val passwordResetService: PasswordResetService,
+    private val ssoService: SsoService
 ) {
 
     @PostMapping("/login")
@@ -28,6 +32,15 @@ class AuthController(
         val resultado = authService.login(request)
         return ResponseEntity.ok(resultado)
     }
+
+    /** Público: si el inicio único con la cuenta Sulotec está encendido y con qué datos va el front a Sulotec. */
+    @GetMapping("/sso/config")
+    fun ssoConfig(): ResponseEntity<SsoConfigResponse> = ResponseEntity.ok(ssoService.config())
+
+    /** Público: canjea el código de Sulotec y responde exactamente lo mismo que /login. */
+    @PostMapping("/sso")
+    fun sso(@RequestBody(required = false) request: SsoLoginRequest?): ResponseEntity<LoginResponse> =
+        ResponseEntity.ok(ssoService.entrar(request ?: SsoLoginRequest()))
 
     @GetMapping("/me")
     fun me(authentication: Authentication): ResponseEntity<UsuarioLoginResponse> {

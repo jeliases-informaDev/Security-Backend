@@ -49,6 +49,8 @@ class SecurityConfig(
                         "/api/public/**",
                         "/actuator/health",
                         "/api/auth/login",
+                        "/api/auth/sso",
+                        "/api/auth/sso/config",
                         "/api/auth/forgot-password",
                         "/api/auth/reset-password",
 

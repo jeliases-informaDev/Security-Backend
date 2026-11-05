@@ -70,6 +70,9 @@ interface UsuarioRepository : JpaRepository<Usuario, Int> {
         @Param("correo") correo: String
     ): Usuario?
 
+    // Para el inicio unico con la cuenta Sulotec (el correo es unico); los roles se leen dentro de la transaccion.
+    fun findByCorreoIgnoreCase(correo: String): Usuario?
+
     fun existsByUsuario(
         usuario: String
     ): Boolean

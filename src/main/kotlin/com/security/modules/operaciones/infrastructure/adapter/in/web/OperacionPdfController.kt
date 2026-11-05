@@ -1,5 +1,8 @@
 ﻿package com.security.modules.operaciones.infrastructure.adapter.`in`.web
 
+import com.security.modules.licencias.CobroAcciones
+import com.security.modules.licencias.conCobro
+import com.security.modules.licencias.dominio.TIPO_OPERACION_PDF
 import com.security.modules.operaciones.application.service.AccesoEmpresaService
 import com.security.modules.operaciones.application.usecase.ExportarOperacionPdfUseCase
 import com.security.modules.operaciones.application.usecase.OperacionNoEncontradaException
@@ -23,7 +26,8 @@ import org.springframework.web.bind.annotation.RestController
 
 class OperacionPdfController(
     private val exportarOperacionPdfUseCase: ExportarOperacionPdfUseCase,
-    private val acceso: AccesoEmpresaService
+    private val acceso: AccesoEmpresaService,
+    private val cobro: CobroAcciones? = null
 ) {
 
     @GetMapping("/{id}/exportar-pdf")
@@ -32,7 +36,10 @@ class OperacionPdfController(
     ): ResponseEntity<ByteArray> {
         // Solo el PDF de un registro de la propia empresa (un administrador, cualquiera).
         acceso.comprobarRegistro(id)
-        val pdf = exportarOperacionPdfUseCase.ejecutar(id)
+        // Se avisa a Sulotec (operacion_pdf); la misma persona y el mismo registro en dos minutos dan la misma clave.
+        val pdf = cobro.conCobro(TIPO_OPERACION_PDF, "PDF de la operacion $id", criterios = listOf(id.toString())) {
+            exportarOperacionPdfUseCase.ejecutar(id)
+        }
 
         val headers = HttpHeaders().apply {
             contentType = MediaType.APPLICATION_PDF

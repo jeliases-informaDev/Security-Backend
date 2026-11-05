@@ -1,5 +1,7 @@
 ﻿package com.security.modules.matrices.infrastructure.controller
 
+import com.security.modules.licencias.CobroAcciones
+import com.security.modules.licencias.dominio.TIPO_MATRIZ_PDF
 import com.security.modules.matrices.application.service.MatrizRiesgoConsultaService
 import com.security.modules.matrices.infrastructure.export.MatrizRiesgoPdfService
 import org.springframework.http.ContentDisposition
@@ -19,7 +21,8 @@ import java.security.Principal
 
 class MatrizRiesgoPdfController(
     private val matrizRiesgoConsultaService: MatrizRiesgoConsultaService,
-    private val matrizRiesgoPdfService: MatrizRiesgoPdfService
+    private val matrizRiesgoPdfService: MatrizRiesgoPdfService,
+    private val cobro: CobroAcciones
 ) {
 
     @GetMapping(
@@ -37,11 +40,15 @@ class MatrizRiesgoPdfController(
                 id = id
             )
 
+        // Se avisa a Sulotec (matriz_pdf) con el análisis ya encontrado; la misma persona y la misma
+        // matriz en dos minutos dan la misma clave (un reintento de la descarga no cobra dos veces).
         val pdf =
-            matrizRiesgoPdfService.generar(
-                analisis = analisis,
-                username = principal.name
-            )
+            cobro.ejecutar(TIPO_MATRIZ_PDF, "PDF de la matriz $id", criterios = listOf(id.toString())) {
+                matrizRiesgoPdfService.generar(
+                    analisis = analisis,
+                    username = principal.name
+                )
+            }
 
         val disposition =
             ContentDisposition

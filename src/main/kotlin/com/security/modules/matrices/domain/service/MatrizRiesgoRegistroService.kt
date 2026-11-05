@@ -1,5 +1,7 @@
 ﻿package com.security.modules.matrices.application.service
 
+import com.security.modules.licencias.CobroAcciones
+import com.security.modules.licencias.dominio.TIPO_MATRIZ_REGISTRAR
 import com.security.modules.matrices.application.dto.GuardarMatrizRiesgoRequest
 import com.security.modules.matrices.application.dto.MatrizRiesgoRegistroResponse
 import com.security.modules.matrices.application.usecase.CalcularMatrizRiesgoUseCase
@@ -31,7 +33,8 @@ class MatrizRiesgoRegistroService(
     private val procesoRepository: MatrizRiesgoProcesoRepository,
     private val areaProcesoRepository: MatrizRiesgoAreaProcesoRepository,
     private val analisisRepository: MatrizRiesgoAnalisisRepository,
-    private val calculadora: CalcularMatrizRiesgoUseCase
+    private val calculadora: CalcularMatrizRiesgoUseCase,
+    private val cobro: CobroAcciones
 
 ) {
 
@@ -58,6 +61,10 @@ class MatrizRiesgoRegistroService(
      *
      * El controller valida previamente que los campos
      * obligatorios estén presentes.
+     *
+     * Se avisa a Sulotec (matriz_registrar) antes de guardar;
+     * si el guardado falla, el consumo se anula. Los borradores
+     * (guardar) no avisan nada.
      */
     @Transactional
     fun registrar(
@@ -65,11 +72,13 @@ class MatrizRiesgoRegistroService(
         request: GuardarMatrizRiesgoRequest
     ): MatrizRiesgoRegistroResponse {
 
-        return persistir(
-            username = username,
-            request = request,
-            estado = EstadoAnalisis.ABIERTO
-        )
+        return cobro.ejecutar(TIPO_MATRIZ_REGISTRAR, "registro de matriz de riesgo") {
+            persistir(
+                username = username,
+                request = request,
+                estado = EstadoAnalisis.ABIERTO
+            )
+        }
     }
 
     @Transactional

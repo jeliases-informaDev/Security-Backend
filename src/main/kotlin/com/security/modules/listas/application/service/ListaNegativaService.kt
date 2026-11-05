@@ -1,5 +1,8 @@
 package com.security.modules.listas.application.service
 
+import com.security.modules.licencias.LicenciaContexto
+import com.security.modules.licencias.LicenciaService
+import com.security.modules.licencias.dominio.TIPO_BUSQUEDA_LISTAS
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.domain.HistorialConsulta
 import com.security.modules.listas.dto.HistorialConsultaResponse
@@ -20,16 +23,15 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
-import com.security.modules.creditos.application.service.CreditoService
-import com.security.modules.creditos.domain.AccionCredito
 
 @Service
 class ListaNegativaService(
-    private val creditoService: CreditoService,
     private val entidadRepository: EntidadRepository,
     private val historialConsultaRepository: HistorialConsultaRepository,
     private val usuarioRepository: UsuarioRepository,
     private val visibilidad: VisibilidadEmpresaService,
+    private val licenciaContexto: LicenciaContexto,
+    private val licenciaService: LicenciaService,
     private val listaNegativaPdfService: ListaNegativaPdfService = ListaNegativaPdfService()
 ) {
 
@@ -82,17 +84,49 @@ class ListaNegativaService(
             )
         }
 
-        // P2: Cobro atómico de créditos (solo en la primera página de la búsqueda)
-        if (pagina == 0) {
-            usuarioRepository.findByUsuario(username)?.let { user ->
-                creditoService.consumir(
-                    usuario = user,
-                    accion = AccionCredito.LISTA_BUSQUEDA,
-                    referencia = "buscar:doc=$documentoLimpio,nom=$nombresLimpios"
-                )
-            }
+        // Solo la primera página es una búsqueda nueva: pasar de página no consume. El token se pide antes de consultar.
+        val claveConsumo = if (pagina == 0) {
+            consumirBusqueda(listOf(documentoLimpio, tipoDocumentoLimpio, nombresLimpios, paternoLimpio, maternoLimpio))
+        } else {
+            null
         }
 
+        // Si la consulta falla después de consumir, se devuelve el token.
+        return try {
+            consultarPagina(
+                username, pagina, tamanoFinal,
+                documentoLimpio, tipoDocumentoLimpio, nombresLimpios, paternoLimpio, maternoLimpio
+            )
+        } catch (e: Exception) {
+            claveConsumo?.let { licenciaService.anular(it) }
+            throw e
+        }
+    }
+
+    /**
+     * Pide 1 token a Sulotec para la búsqueda y devuelve la clave del consumo (null si no se consumió: licencias
+     * apagadas, sin sesión o una cuenta sin empresa con UUID). La clave es la misma para la misma persona y los mismos
+     * criterios durante dos minutos, así un doble clic o recargar la búsqueda no cobra dos veces.
+     */
+    private fun consumirBusqueda(criterios: List<String?>): String? {
+        if (!licenciaService.activo) return null
+        val contexto = licenciaContexto.actual() ?: return null
+        val uuid = contexto.empresaUuid ?: return null
+        val clave = licenciaService.claveBusqueda(uuid, contexto.usuario, criterios)
+        licenciaService.consumirComo(contexto, TIPO_BUSQUEDA_LISTAS, clave, "busqueda en listas negativas")
+        return clave
+    }
+
+    private fun consultarPagina(
+        username: String,
+        pagina: Int,
+        tamanoFinal: Int,
+        documentoLimpio: String?,
+        tipoDocumentoLimpio: String?,
+        nombresLimpios: String?,
+        paternoLimpio: String?,
+        maternoLimpio: String?
+    ): Page<ResultadoBusquedaResponse> {
         val pageable = PageRequest.of(pagina, tamanoFinal)
         val paginaEntidades = entidadRepository.buscar(
             documento = documentoLimpio,
@@ -152,22 +186,15 @@ class ListaNegativaService(
     }
 
     /**
-     * Exporta el reporte de la entidad consultada a formato PDF con cobro atómico de 1 crédito.
+     * Exporta el reporte de la entidad consultada a formato PDF. No consume tokens: lo que se cobra es la búsqueda.
      */
     @Transactional
     fun exportarPdf(username: String, entidadId: Int): ByteArray {
-        val usuario = usuarioRepository.findByUsuario(username)
+        usuarioRepository.findByUsuario(username)
             ?: throw ResourceNotFoundException("Usuario no encontrado")
 
         val entidad = entidadRepository.buscarPorIdConDetalle(entidadId)
             ?: throw ResourceNotFoundException("No se encontró el registro solicitado")
-
-        // Cobro atómico de créditos (1 crédito)
-        creditoService.consumir(
-            usuario = usuario,
-            accion = AccionCredito.LISTA_PDF,
-            referencia = "lista:pdf:$entidadId:${entidad.documento}"
-        )
 
         return listaNegativaPdfService.generar(entidad.toResponse(), username)
     }

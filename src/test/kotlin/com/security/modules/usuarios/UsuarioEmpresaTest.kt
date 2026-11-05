@@ -1,6 +1,10 @@
 ﻿package com.security.modules.usuarios
 
 import com.security.modules.empresas.application.service.EmpresaService
+import com.security.modules.licencias.LicenciaContexto
+import com.security.modules.licencias.LicenciaReglas
+import com.security.modules.licencias.LicenciaService
+import com.security.modules.licencias.LicenciaSinCupoException
 import com.security.modules.usuarios.application.service.UsuarioService
 import com.security.modules.usuarios.dto.CambiarEmpresaRequest
 import com.security.modules.usuarios.dto.UsuarioCreateRequest
@@ -14,6 +18,8 @@ import com.security.shared.exceptions.ResourceNotFoundException
 import io.mockk.*
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.web.server.ResponseStatusException
 import java.time.LocalDateTime
@@ -26,7 +32,9 @@ class UsuarioEmpresaTest {
     private val usuarioRoles = mockk<UsuarioRolRepository>()
     private val encoder = mockk<PasswordEncoder>()
     private val empresaService = mockk<EmpresaService>()
-    private val service = UsuarioService(mockk(relaxed = true), usuarios, roles, usuarioRoles, encoder, empresaService)
+    private val licencias = mockk<LicenciaService>(relaxed = true)
+    private val contexto = mockk<LicenciaContexto>()
+    private val service = UsuarioService(usuarios, roles, usuarioRoles, encoder, empresaService, licencias, contexto)
 
     private fun rol(codigo: String = "USUARIO", nombre: String = "Usuario", activo: Boolean = true) =
         Roles(id = 3, codigo = codigo, nombre = nombre, activo = activo,
@@ -60,6 +68,73 @@ class UsuarioEmpresaTest {
         assertEquals("Peru Luz S.A.C", guardado.captured.empresa)
         assertEquals("Peru Luz S.A.C", respuesta.empresa)
         assertEquals("USUARIO", respuesta.rolCodigo)
+        verify { licencias.verificarCupo("u", 1, false) }
+        verify { licencias.reportarActivosLuego("Peru Luz S.A.C") }
+    }
+
+    @Test
+    fun `crear responde 409 y no guarda nada si el plan no tiene cupo`() {
+        prepararCreacion()
+        every { empresaService.resolverEmpresaActiva("peru luz") } returns Empresa(id = 1, nombre = "Peru Luz S.A.C", sigla = "PLZ", uuid = "u")
+        every { usuarios.existsByUsuario("plz.ana") } returns false
+        every { licencias.verificarCupo("u", 1, false) } throws
+            LicenciaSinCupoException(activos = 5, usuariosMax = 5, enlace = LicenciaReglas.ENLACE_MI_LICENCIA)
+
+        val error = assertFailsWith<LicenciaSinCupoException> { service.crear(solicitud()) }
+
+        assertEquals(LicenciaReglas.CODE_SIN_CUPO, error.code)
+        assertEquals(5L, error.usuariosMax)
+        verify(exactly = 0) { usuarios.save(any()) }
+        verify(exactly = 0) { usuarioRoles.save(any()) }
+    }
+
+    private fun adminDeEmpresa(nombre: String = "jefa") =
+        UsernamePasswordAuthenticationToken(nombre, null, listOf(SimpleGrantedAuthority("ROLE_ADMINISTRADOR_EMPRESA")))
+
+    private fun cuentaDe(id: Int, nombre: String, empresa: String?, activo: Boolean = true) =
+        Usuario(id = id, usuario = nombre, clave = "x", correo = "$nombre@example.test", empresa = empresa, activo = activo,
+            fechaCreacion = LocalDateTime.now(), fechaActualizacion = LocalDateTime.now())
+
+    @Test
+    fun `cambiarEstado no deja a un administrador de empresa tocar cuentas de otra empresa`() {
+        val ajena = cuentaDe(3, "luis", "Otra")
+        every { usuarios.findById(3) } returns Optional.of(ajena)
+        every { usuarios.findByUsuario("jefa") } returns cuentaDe(1, "jefa", "Peru Luz S.A.C")
+
+        assertFailsWith<ResourceNotFoundException> { service.cambiarEstado(3, false, adminDeEmpresa()) }
+
+        assertTrue(ajena.activo)
+        verify(exactly = 0) { usuarios.save(any()) }
+    }
+
+    @Test
+    fun `cambiarEstado desactiva una cuenta de su empresa y reporta las cuentas activas`() {
+        val propia = cuentaDe(3, "luis", " peru luz s.a.c ")
+        every { usuarios.findById(3) } returns Optional.of(propia)
+        every { usuarios.findByUsuario("jefa") } returns cuentaDe(1, "jefa", "Peru Luz S.A.C")
+        every { usuarios.save(any()) } answers { firstArg() }
+        every { usuarios.findByUsuario("luis") } returns null
+
+        val respuesta = service.cambiarEstado(3, false, adminDeEmpresa())
+
+        assertFalse(respuesta.activo)
+        verify(exactly = 0) { licencias.verificarCupo(any(), any(), any()) }
+        verify { licencias.reportarActivosLuego(" peru luz s.a.c ") }
+    }
+
+    @Test
+    fun `reactivar una cuenta sin cupo en el plan responde 409`() {
+        val inactiva = cuentaDe(3, "luis", "Peru Luz S.A.C", activo = false)
+        every { usuarios.findById(3) } returns Optional.of(inactiva)
+        every { usuarios.findByUsuario("jefa") } returns cuentaDe(1, "jefa", "Peru Luz S.A.C")
+        every { contexto.uuidDeEmpresa("Peru Luz S.A.C") } returns "u"
+        every { licencias.verificarCupo("u", 1, false) } throws
+            LicenciaSinCupoException(activos = 5, usuariosMax = 5, enlace = LicenciaReglas.ENLACE_MI_LICENCIA)
+
+        assertFailsWith<LicenciaSinCupoException> { service.cambiarEstado(3, true, adminDeEmpresa()) }
+
+        assertFalse(inactiva.activo)
+        verify(exactly = 0) { usuarios.save(any()) }
     }
 
     @Test
@@ -82,11 +157,15 @@ class UsuarioEmpresaTest {
         every { usuarios.findById(3) } returns Optional.of(cuenta)
         every { empresaService.resolverActiva("peru luz") } returns "Peru Luz S.A.C"
         every { usuarios.save(any()) } answers { firstArg() }
+        every { contexto.uuidDeEmpresa("Peru Luz S.A.C") } returns "u"
 
-        val respuesta = service.cambiarEmpresa(3, CambiarEmpresaRequest("peru luz"))
+        val respuesta = service.cambiarEmpresa(3, CambiarEmpresaRequest("peru luz"), true)
 
         assertEquals("Peru Luz S.A.C", respuesta.empresa)
         assertEquals("Peru Luz S.A.C", cuenta.empresa)
+        // la cuenta esta activa: se pide el cupo de la empresa destino y se reportan las dos
+        verify { licencias.verificarCupo("u", 1, true) }
+        verify { licencias.reportarActivosLuego("Otra", "Peru Luz S.A.C") }
     }
 
     @Test

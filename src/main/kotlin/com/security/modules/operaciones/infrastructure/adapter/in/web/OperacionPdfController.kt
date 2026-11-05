@@ -14,10 +14,6 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import com.security.modules.creditos.application.service.CreditoService
-import com.security.modules.creditos.domain.AccionCredito
-import com.security.shared.datos.repositories.UsuarioRepository
-import org.springframework.security.core.context.SecurityContextHolder
 
 
 
@@ -26,8 +22,6 @@ import org.springframework.security.core.context.SecurityContextHolder
 @RequestMapping("/api/operaciones", "/api/pdf")
 
 class OperacionPdfController(
-    private val creditoService: CreditoService,
-    private val usuarioRepository: UsuarioRepository,
     private val exportarOperacionPdfUseCase: ExportarOperacionPdfUseCase,
     private val acceso: AccesoEmpresaService
 ) {
@@ -38,12 +32,6 @@ class OperacionPdfController(
     ): ResponseEntity<ByteArray> {
         // Solo el PDF de un registro de la propia empresa (un administrador, cualquiera).
         acceso.comprobarRegistro(id)
-        val auth = SecurityContextHolder.getContext().authentication
-        if (auth != null) {
-            usuarioRepository.findByUsuario(auth.name)?.let { user ->
-                creditoService.consumir(user, AccionCredito.OPERACION_PDF, "operacion:pdf:$id")
-            }
-        }
         val pdf = exportarOperacionPdfUseCase.ejecutar(id)
 
         val headers = HttpHeaders().apply {

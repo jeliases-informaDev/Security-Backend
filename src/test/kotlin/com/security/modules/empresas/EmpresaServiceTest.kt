@@ -140,6 +140,46 @@ class EmpresaServiceTest {
     }
 
     @Test
+    fun `crear guarda el UUID de la cuenta Sulotec si viene y rechaza uno mal escrito o repetido`() {
+        every { empresas.existsByNombreIgnoreCase(any()) } returns false
+        every { empresas.findByUuid("0b6f2c1e-3d4a-4b5c-9d8e-7f6a5b4c3d2e") } returns null
+        val guardada = slot<Empresa>()
+        every { empresas.save(capture(guardada)) } answers { guardada.captured.also { it.id = 12 } }
+
+        service.crear(EmpresaCreateRequest(nombre = "Nueva", uuid = " 0B6F2C1E-3D4A-4B5C-9D8E-7F6A5B4C3D2E "))
+        assertEquals("0b6f2c1e-3d4a-4b5c-9d8e-7f6a5b4c3d2e", guardada.captured.uuid)
+
+        val error = assertFailsWith<ResponseStatusException> { service.crear(EmpresaCreateRequest(nombre = "Otra", uuid = "no-es-uuid")) }
+        assertEquals(400, error.statusCode.value())
+
+        every { empresas.findByUuid("11111111-2222-3333-4444-555555555555") } returns empresa(7, "Ya Existe")
+        assertFailsWith<ConflictException> {
+            service.crear(EmpresaCreateRequest(nombre = "Otra", uuid = "11111111-2222-3333-4444-555555555555"))
+        }
+        verify(exactly = 1) { empresas.save(any()) }
+    }
+
+    @Test
+    fun `actualizar cambia el UUID solo si viene y acepta el suyo propio`() {
+        val existente = empresa(5, "Peru Luz").also { it.uuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" }
+        every { empresas.findById(5) } returns Optional.of(existente)
+        every { empresas.save(any()) } answers { firstArg() }
+        sinCuentas()
+
+        assertEquals("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", service.actualizar(5, EmpresaUpdateRequest(null)).uuid)
+
+        every { empresas.findByUuid("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee") } returns existente
+        assertEquals("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            service.actualizar(5, EmpresaUpdateRequest(null, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")).uuid)
+
+        every { empresas.findByUuid("11111111-2222-3333-4444-555555555555") } returns empresa(6, "Otra")
+        assertFailsWith<ConflictException> {
+            service.actualizar(5, EmpresaUpdateRequest(null, "11111111-2222-3333-4444-555555555555"))
+        }
+        assertEquals("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", existente.uuid)
+    }
+
+    @Test
     fun `cambiarEstado activa y desactiva`() {
         val existente = empresa(5, "Peru Luz")
         every { empresas.findById(5) } returns Optional.of(existente)

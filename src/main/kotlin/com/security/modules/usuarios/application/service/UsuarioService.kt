@@ -1,6 +1,8 @@
 ﻿package com.security.modules.usuarios.application.service
 
 import com.security.modules.empresas.application.service.EmpresaService
+import com.security.modules.licencias.LicenciaContexto
+import com.security.modules.licencias.LicenciaService
 import com.security.modules.usuarios.dto.CambiarEmpresaRequest
 import com.security.modules.usuarios.dto.CambiarRolRequest
 import com.security.modules.usuarios.dto.UsuarioCreateRequest
@@ -13,24 +15,27 @@ import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.datos.repositories.UsuarioRolRepository
 import com.security.shared.exceptions.ConflictException
 import com.security.shared.exceptions.ResourceNotFoundException
+import com.security.shared.security.esAdministrador
+import com.security.shared.security.mismaEmpresa
 import com.security.shared.security.usuarioConSigla
+import org.springframework.security.core.Authentication
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
-import com.security.modules.creditos.application.service.CreditoService
 
 
 
 @Service
 
 class UsuarioService(
-    private val creditoService: CreditoService,
     private val usuarioRepository: UsuarioRepository,
     private val rolesRepository: RolesRepository,
     private val usuarioRolRepository: UsuarioRolRepository,
     private val passwordEncoder: PasswordEncoder,
-    private val empresaService: EmpresaService
+    private val empresaService: EmpresaService,
+    private val licenciaService: LicenciaService,
+    private val licenciaContexto: LicenciaContexto
 ) {
 
     fun listar(): List<UsuarioResponse> {
@@ -46,14 +51,13 @@ class UsuarioService(
             .map { it.toResponse() }
     }
 
+    /** actorEsSulotec = quien crea es el administrador de Sulotec (cambia el enlace del aviso de cupo). */
     @Transactional
-    fun crear(request: UsuarioCreateRequest): UsuarioResponse {
+    fun crear(request: UsuarioCreateRequest, actorEsSulotec: Boolean = false): UsuarioResponse {
 
         // La empresa se elige de la lista de empresas; se guarda con el nombre exacto de la lista.
         val empresaElegida = empresaService.resolverEmpresaActiva(request.empresa)
         val empresa = empresaElegida.nombre
-        // BPMN P2: Validar cupo de usuarios activos permitidos en la empresa
-        empresaElegida.id?.let { creditoService.validarCupoUsuarios(it) }
         // El usuario interno lleva la sigla de la empresa delante (hcyo.jperez): unico entre empresas.
         val nombreUsuario = empresaElegida.sigla?.let { usuarioConSigla(it, request.usuario) } ?: request.usuario.trim()
 
@@ -66,6 +70,9 @@ class UsuarioService(
 
         val rol = rolesRepository.findByCodigo(request.rolCodigo)
             ?: throw ResourceNotFoundException("El rol '${request.rolCodigo}' no existe")
+
+        // La cuenta nace activa y ocupa un lugar del plan: se pide el cupo a Sulotec antes de guardarla.
+        licenciaService.verificarCupo(empresaElegida.uuid, 1, actorEsSulotec)
 
         val now = LocalDateTime.now()
 
@@ -88,6 +95,7 @@ class UsuarioService(
         usuarioRolRepository.save(UsuarioRol(usuario = usuarioGuardado, rol = rol))
 
         usuarioGuardado.roles = mutableListOf(UsuarioRol(usuario = usuarioGuardado, rol = rol))
+        licenciaService.reportarActivosLuego(empresa)
 
         return usuarioGuardado.toResponse()
     }
@@ -114,15 +122,24 @@ class UsuarioService(
      * van con ella (el modulo de operaciones los muestra segun la empresa de su usuario).
      */
     @Transactional
-    fun cambiarEmpresa(usuarioId: Int, request: CambiarEmpresaRequest): UsuarioResponse {
+    fun cambiarEmpresa(usuarioId: Int, request: CambiarEmpresaRequest, actorEsSulotec: Boolean = false): UsuarioResponse {
 
         val usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow { ResourceNotFoundException("Usuario no encontrado") }
 
-        usuario.empresa = empresaService.resolverActiva(request.empresa)
+        val anterior = usuario.empresa
+        val nueva = empresaService.resolverActiva(request.empresa)
+        // Una cuenta activa pasa a ocupar un lugar en el plan de la empresa destino: se pide ese cupo antes de moverla.
+        if (usuario.activo && !mismaEmpresa(anterior, nueva)) {
+            licenciaService.verificarCupo(licenciaContexto.uuidDeEmpresa(nueva), 1, actorEsSulotec)
+        }
+        usuario.empresa = nueva
         usuario.fechaActualizacion = LocalDateTime.now()
 
-        return usuarioRepository.save(usuario).toResponse()
+        val guardado = usuarioRepository.save(usuario)
+        // Cambian las cuentas activas de las dos empresas.
+        licenciaService.reportarActivosLuego(anterior, nueva)
+        return guardado.toResponse()
     }
 
     fun listarRoles(): List<RolResponse> {
@@ -133,15 +150,31 @@ class UsuarioService(
     }
 
     @Transactional
-    fun cambiarEstado(usuarioId: Int, activo: Boolean): UsuarioResponse {
+    fun cambiarEstado(usuarioId: Int, activo: Boolean, autenticacion: Authentication): UsuarioResponse {
 
         val usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow { ResourceNotFoundException("Usuario no encontrado") }
+
+        // Un administrador de empresa solo toca cuentas de su propia empresa; una ajena responde como si no existiera.
+        val esSulotec = autenticacion.esAdministrador()
+        if (!esSulotec) {
+            val actor = usuarioRepository.findByUsuario(autenticacion.name)
+            if (actor == null || !mismaEmpresa(actor.empresa, usuario.empresa)) {
+                throw ResourceNotFoundException("Usuario no encontrado")
+            }
+        }
+
+        // Reactivar una cuenta vuelve a ocupar un lugar del plan: se pide el cupo antes.
+        if (activo && !usuario.activo) {
+            licenciaService.verificarCupo(licenciaContexto.uuidDeEmpresa(usuario.empresa), 1, esSulotec)
+        }
+        val cambia = usuario.activo != activo
 
         usuario.activo = activo
         usuario.fechaActualizacion = LocalDateTime.now()
 
         val usuarioActualizado = usuarioRepository.save(usuario)
+        if (cambia) licenciaService.reportarActivosLuego(usuarioActualizado.empresa)
 
         return usuarioRepository.findByUsuario(usuarioActualizado.usuario)?.toResponse()
             ?: usuarioActualizado.toResponse()

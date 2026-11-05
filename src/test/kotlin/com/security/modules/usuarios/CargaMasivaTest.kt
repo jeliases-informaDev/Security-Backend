@@ -3,6 +3,8 @@
 import com.security.modules.auth.application.service.NotificationService
 import com.security.modules.auth.application.service.PasswordResetService
 import com.security.modules.empresas.application.service.EmpresaService
+import com.security.modules.licencias.LicenciaService
+import com.security.modules.licencias.LicenciaSinCupoException
 import com.security.modules.usuarios.application.service.CargaMasivaService
 import com.security.modules.usuarios.dto.CargaMasivaRequest
 import com.security.modules.usuarios.dto.CuentaMasivaRequest
@@ -30,7 +32,8 @@ class CargaMasivaTest {
     private val empresaService = mockk<EmpresaService>()
     private val reset = mockk<PasswordResetService>()
     private val correo = mockk<NotificationService>()
-    private val service = CargaMasivaService(mockk(relaxed = true), usuarios, roles, usuarioRoles, encoder, empresaService, reset, correo)
+    private val licencias = mockk<LicenciaService>(relaxed = true)
+    private val service = CargaMasivaService(usuarios, roles, usuarioRoles, encoder, empresaService, reset, correo, licencias)
 
     private val ahora = LocalDateTime.now()
     private fun rol(codigo: String) = Roles(id = 1, codigo = codigo, nombre = codigo, activo = true, fechaCreacion = ahora, fechaActualizacion = ahora)
@@ -65,6 +68,20 @@ class CargaMasivaTest {
         assertEquals("Ya existe una cuenta con ese correo", respuesta.filas[3].mensaje)
         assertEquals("El rol 'NOEXISTE' no existe", respuesta.filas[4].mensaje)
         assertEquals("Faltan los nombres", respuesta.filas[5].mensaje)
+        verify(exactly = 0) { usuarios.save(any()) }
+    }
+
+    @Test
+    fun `si el lote no cabe en el plan responde 409 y no crea nada, tambien al solo validar`() {
+        preparar(porCorreo = false)
+        every { licencias.verificarCupo("u", 2, true) } throws
+            LicenciaSinCupoException(activos = 9, usuariosMax = 10, enlace = "https://sulotec.com/licencias")
+        val cuentas = listOf(fila("a@caja.pe"), fila("b@caja.pe"))
+
+        assertFailsWith<LicenciaSinCupoException> { service.cargar(CargaMasivaRequest("Caja Huancayo", cuentas = cuentas), true) }
+        assertFailsWith<LicenciaSinCupoException> {
+            service.cargar(CargaMasivaRequest("Caja Huancayo", soloValidar = true, cuentas = cuentas), true)
+        }
         verify(exactly = 0) { usuarios.save(any()) }
     }
 

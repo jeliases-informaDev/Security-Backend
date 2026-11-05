@@ -1,6 +1,10 @@
 package com.security.modules.listas
 
 import com.security.SecurityConfig
+import com.security.modules.licencias.ContextoLicencia
+import com.security.modules.licencias.LicenciaContexto
+import com.security.modules.licencias.LicenciaService
+import com.security.modules.licencias.dominio.TIPO_BUSQUEDA_LISTAS
 import com.security.modules.listas.application.service.ListaNegativaService
 import com.security.modules.listas.controller.infraestructure.ListaNegativaController
 import com.security.modules.listas.domain.Entidad
@@ -32,7 +36,9 @@ class BusquedaPaginadaTest {
     private val entidades = mockk<EntidadRepository>()
     private val historial = mockk<HistorialConsultaRepository>()
     private val usuarios = mockk<UsuarioRepository>()
-    private val service = ListaNegativaService(mockk(relaxed = true), entidades, historial, usuarios, mockk())
+    private val contexto = mockk<LicenciaContexto>()
+    private val licencias = mockk<LicenciaService>(relaxed = true)
+    private val service = ListaNegativaService(entidades, historial, usuarios, mockk(), contexto, licencias)
     private val controller = ListaNegativaController(service)
     private val autenticacion = mockk<Authentication>()
     private val primeraPagina = PageRequest.of(0, 20)
@@ -79,7 +85,7 @@ class BusquedaPaginadaTest {
     }
 
     @Test
-    fun `exportarPdf descuenta credito y entrega el binario PDF con cabeceras`() {
+    fun `exportarPdf entrega el binario PDF con cabeceras y no consume tokens`() {
         val p = persona(42)
         every { entidades.buscarPorIdConDetalle(42) } returns p
 
@@ -88,6 +94,39 @@ class BusquedaPaginadaTest {
         assertEquals(MediaType.APPLICATION_PDF, respuesta.headers.contentType)
         assertTrue(respuesta.headers.getFirst(HttpHeaders.CONTENT_DISPOSITION)!!.contains("listas-negativas-00000042.pdf"))
         assertTrue(respuesta.body!!.isNotEmpty())
+        verify(exactly = 0) { licencias.consumirComo(any(), any(), any(), any()) }
+    }
+
+    private val quien = ContextoLicencia(usuario = "analista", empresa = "Peru Luz", empresaUuid = "u-1", esSulotec = false)
+
+    private fun licenciasEncendidas() {
+        every { licencias.activo } returns true
+        every { contexto.actual() } returns quien
+        every { licencias.claveBusqueda("u-1", "analista", any()) } returns "clave-1"
+    }
+
+    @Test
+    fun `la pagina 0 pide 1 token antes de consultar y la pagina 1 no`() {
+        licenciasEncendidas()
+        val p = persona(1)
+        every { entidades.buscar(any(), any(), any(), any(), any(), any()) } returns PageImpl(listOf(p), primeraPagina, 30)
+        every { entidades.cargarManchas(any()) } returns listOf(p)
+
+        service.buscar("analista", null, null, null, "GARCIA", null, 0, 20)
+        verify(exactly = 1) { licencias.consumirComo(quien, TIPO_BUSQUEDA_LISTAS, "clave-1", any()) }
+
+        service.buscar("analista", null, null, null, "GARCIA", null, 1, 20)
+        verify(exactly = 1) { licencias.consumirComo(any(), any(), any(), any()) }
+        verify(exactly = 0) { licencias.anular(any()) }
+    }
+
+    @Test
+    fun `si la consulta falla despues de consumir se devuelve el token`() {
+        licenciasEncendidas()
+        every { entidades.buscar(any(), any(), any(), any(), any(), any()) } throws IllegalStateException("sin base")
+
+        assertFailsWith<IllegalStateException> { service.buscar("analista", null, null, null, "GARCIA", null, 0, 20) }
+        verify(exactly = 1) { licencias.anular("clave-1") }
     }
 
     @Test

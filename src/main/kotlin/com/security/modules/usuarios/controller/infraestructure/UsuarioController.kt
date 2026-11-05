@@ -53,7 +53,7 @@ class UsuarioController(
             }
             request.copy(empresa = miEmpresa)
         }
-        val creado = usuarioService.crear(requestAjustado)
+        val creado = usuarioService.crear(requestAjustado, authentication.esAdministrador())
         return ResponseEntity.status(HttpStatus.CREATED).body(creado)
     }
 
@@ -70,16 +70,20 @@ class UsuarioController(
     @PutMapping("/{id}/empresa")
     fun cambiarEmpresa(
         @PathVariable id: Int,
-        @Valid @RequestBody request: CambiarEmpresaRequest
+        @Valid @RequestBody request: CambiarEmpresaRequest,
+        authentication: Authentication
     ): ResponseEntity<UsuarioResponse> {
-        return ResponseEntity.ok(usuarioService.cambiarEmpresa(id, request))
+        return ResponseEntity.ok(usuarioService.cambiarEmpresa(id, request, authentication.esAdministrador()))
     }
 
     // Alta por lotes para una empresa (soloValidar = true revisa sin crear). Todo o nada.
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     @PostMapping("/carga-masiva")
-    fun cargaMasiva(@Valid @RequestBody request: CargaMasivaRequest): ResponseEntity<CargaMasivaResponse> {
-        return ResponseEntity.ok(cargaMasivaService.cargar(request))
+    fun cargaMasiva(
+        @Valid @RequestBody request: CargaMasivaRequest,
+        authentication: Authentication
+    ): ResponseEntity<CargaMasivaResponse> {
+        return ResponseEntity.ok(cargaMasivaService.cargar(request, authentication.esAdministrador()))
     }
 
     // Manda (o vuelve a mandar) el enlace para que la persona elija su clave.
@@ -100,12 +104,14 @@ class UsuarioController(
         }
     }
 
+    // Un administrador de empresa solo cambia el estado de las cuentas de su propia empresa (lo revisa el servicio).
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'ADMINISTRADOR_EMPRESA')")
     @PatchMapping("/{id}/estado")
     fun cambiarEstado(
         @PathVariable id: Int,
-        @RequestParam activo: Boolean
+        @RequestParam activo: Boolean,
+        authentication: Authentication
     ): ResponseEntity<UsuarioResponse> {
-        return ResponseEntity.ok(usuarioService.cambiarEstado(id, activo))
+        return ResponseEntity.ok(usuarioService.cambiarEstado(id, activo, authentication))
     }
 }

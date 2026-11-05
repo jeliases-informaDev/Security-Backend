@@ -16,7 +16,7 @@ import kotlin.test.*
 class ResumenEmpresaTest {
     private val operaciones = mockk<OperacionRepository>()
     private val usuarios = mockk<UsuarioRepository>()
-    private val service = OperacionService(mockk(relaxed = true), operaciones, usuarios)
+    private val service = OperacionService(operaciones, usuarios)
     private val acceso = mockk<AccesoEmpresaService>()
     private val controller = OperacionController(service, acceso)
 

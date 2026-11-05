@@ -3,6 +3,7 @@
 import com.security.modules.auth.application.service.NotificationService
 import com.security.modules.auth.application.service.PasswordResetService
 import com.security.modules.empresas.application.service.EmpresaService
+import com.security.modules.licencias.LicenciaService
 import com.security.modules.usuarios.dto.CargaMasivaRequest
 import com.security.modules.usuarios.dto.CargaMasivaResponse
 import com.security.modules.usuarios.dto.CuentaMasivaRequest
@@ -23,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.security.SecureRandom
 import java.time.LocalDateTime
-import com.security.modules.creditos.application.service.CreditoService
 
 
 
@@ -39,14 +39,14 @@ import com.security.modules.creditos.application.service.CreditoService
 @Service
 
 class CargaMasivaService(
-    private val creditoService: CreditoService,
     private val usuarioRepository: UsuarioRepository,
     private val rolesRepository: RolesRepository,
     private val usuarioRolRepository: UsuarioRolRepository,
     private val passwordEncoder: PasswordEncoder,
     private val empresaService: EmpresaService,
     private val passwordResetService: PasswordResetService,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val licenciaService: LicenciaService
 ) {
 
     private val log = LoggerFactory.getLogger(CargaMasivaService::class.java)
@@ -54,11 +54,10 @@ class CargaMasivaService(
     private class FilaPreparada(val fila: Int, val datos: CuentaMasivaRequest, val correo: String, val nombreCompleto: String,
                                 var usuario: String?, var error: String?)
 
+    /** actorEsSulotec = quien carga es el administrador de Sulotec (cambia el enlace del aviso de cupo). */
     @Transactional
-    fun cargar(request: CargaMasivaRequest): CargaMasivaResponse {
+    fun cargar(request: CargaMasivaRequest, actorEsSulotec: Boolean = false): CargaMasivaResponse {
         val empresa = empresaService.resolverEmpresaActiva(request.empresa)
-        // BPMN P2: Validar cupo de usuarios activos permitidos en la empresa
-        empresa.id?.let { creditoService.validarCupoUsuarios(it) }
         val sigla = empresa.sigla
             ?: throw ResponseStatusException(HttpStatus.CONFLICT, "La empresa ${empresa.nombre} no tiene sigla; vuelve a desplegar o corrígela en Empresas")
         val roles = rolesRepository.findAll().filter { it.activo }.associateBy { it.codigo.trim().uppercase() }
@@ -86,6 +85,12 @@ class CargaMasivaService(
         }
 
         val conError = preparadas.count { it.error != null }
+        // Todas las cuentas válidas del lote nacen activas: deben caber juntas en lo que queda libre del plan. También
+        // al solo validar, para avisar antes de cargar; con errores en una carga real no se crea nada y se ven los errores.
+        val validas = preparadas.size - conError
+        if (validas > 0 && (request.soloValidar || conError == 0)) {
+            licenciaService.verificarCupo(empresa.uuid, validas, actorEsSulotec)
+        }
         val porCorreo = notificationService.invitacionesPorCorreo()
         if (request.soloValidar || conError > 0) {
             return CargaMasivaResponse(
@@ -118,6 +123,7 @@ class CargaMasivaService(
                 usuario = cuenta.usuario, invitacionEnviada = invitada, claveTemporal = if (invitada) null else clave
             )
         }
+        licenciaService.reportarActivosLuego(empresa.nombre)
         return CargaMasivaResponse(
             empresa = empresa.nombre, sigla = sigla, soloValidar = false,
             total = filas.size, listas = 0, creadas = filas.size, conError = 0,

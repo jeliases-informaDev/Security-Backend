@@ -1,5 +1,9 @@
 ﻿package com.security.modules.scoring.application.service
 
+import com.security.modules.licencias.LicenciaContexto
+import com.security.modules.licencias.LicenciaReglas
+import com.security.modules.licencias.LicenciaService
+import com.security.modules.licencias.dominio.TIPO_SCORING
 import com.security.modules.listas.domain.Entidad
 import com.security.modules.listas.infrastructure.EntidadRepository
 import com.security.modules.scoring.domain.ScoringDepartamento
@@ -20,21 +24,20 @@ import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.Normalizer
-import com.security.modules.creditos.application.service.CreditoService
-import com.security.modules.creditos.domain.AccionCredito
 
 
 
 @Service
 
 class ScoringService(
-    private val creditoService: CreditoService,
     private val entidadRepository: EntidadRepository,
     private val ocupacionRepository: ScoringOcupacionRepository,
     private val departamentoRepository: ScoringDepartamentoRepository,
     private val scoringRiesgoRepository: ScoringRiesgoRepository,
     private val usuarioRepository: UsuarioRepository,
-    private val visibilidad: VisibilidadEmpresaService
+    private val visibilidad: VisibilidadEmpresaService,
+    private val licenciaContexto: LicenciaContexto,
+    private val licenciaService: LicenciaService
 ) {
 
     @Transactional(readOnly = true)
@@ -50,7 +53,6 @@ class ScoringService(
 
         val usuario = usuarioRepository.findByUsuario(username)
             ?: throw ResourceNotFoundException("Usuario no encontrado")
-        creditoService.consumir(usuario, AccionCredito.SCORING_EVALUAR, "scoring:entidadId=${request.entidadId}")
 
         val entidad = entidadRepository.buscarPorIdConDetalle(request.entidadId)
             ?: throw ResourceNotFoundException("No se encontró la entidad a evaluar")
@@ -79,19 +81,28 @@ class ScoringService(
 
         val sustento = factores.joinToString("; ") { "${it.nombre}: ${it.valor} (${it.puntaje} x ${it.peso}%)" }
 
-        val scoringGuardado = scoringRiesgoRepository.save(
-            ScoringRiesgo(
-                usuario = usuario,
-                entidad = entidad,
-                ocupacion = ocupacion,
-                departamento = departamento,
-                clienteSensibleTipo = clienteSensibleTipo,
-                volumenTransaccional = request.volumenTransaccional,
-                puntaje = puntajeTotal,
-                sustento = sustento,
-                categoria = categoria
+        // El token se pide recién aquí, con todo resuelto: un 404 de entidad, ocupación o departamento no consume.
+        val claveConsumo = consumirScoring(request.entidadId)
+
+        // Si el guardado falla después de consumir, se devuelve el token.
+        val scoringGuardado = try {
+            scoringRiesgoRepository.save(
+                ScoringRiesgo(
+                    usuario = usuario,
+                    entidad = entidad,
+                    ocupacion = ocupacion,
+                    departamento = departamento,
+                    clienteSensibleTipo = clienteSensibleTipo,
+                    volumenTransaccional = request.volumenTransaccional,
+                    puntaje = puntajeTotal,
+                    sustento = sustento,
+                    categoria = categoria
+                )
             )
-        )
+        } catch (e: Exception) {
+            claveConsumo?.let { licenciaService.anular(it) }
+            throw e
+        }
 
         return ScoringResultResponse(
             id = scoringGuardado.id!!,
@@ -105,6 +116,19 @@ class ScoringService(
             categoria = categoria,
             fechaCreacion = scoringGuardado.fechaCreacion
         )
+    }
+
+    /**
+     * Pide 1 token a Sulotec para la evaluación y devuelve la clave del consumo (null si no se consumió: licencias
+     * apagadas, sin sesión o una cuenta sin empresa con UUID). Cada evaluación es una acción nueva.
+     */
+    private fun consumirScoring(entidadId: Int): String? {
+        if (!licenciaService.activo) return null
+        val contexto = licenciaContexto.actual() ?: return null
+        val uuid = contexto.empresaUuid ?: return null
+        val clave = LicenciaReglas.claveAleatoria(uuid, TIPO_SCORING)
+        licenciaService.consumirComo(contexto, TIPO_SCORING, clave, "scoring de la entidad $entidadId")
+        return clave
     }
 
     @Transactional(readOnly = true)

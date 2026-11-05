@@ -1,5 +1,9 @@
 package com.security.modules.ml.service
 
+import com.security.modules.licencias.LicenciaContexto
+import com.security.modules.licencias.LicenciaReglas
+import com.security.modules.licencias.LicenciaService
+import com.security.modules.licencias.dominio.TIPO_MENSAJE_INDIRA
 import com.security.modules.ml.client.MlClient
 import com.security.modules.ml.dto.CasoMlResponse
 import com.security.modules.ml.dto.IndiraChatRequest
@@ -17,7 +21,9 @@ import java.util.UUID
 @Service
 class MlService(
     private val mlClient: MlClient,
-    private val usuarioRepository: UsuarioRepository
+    private val usuarioRepository: UsuarioRepository,
+    private val licenciaContexto: LicenciaContexto,
+    private val licenciaService: LicenciaService
 ) {
 
     fun chatear(username: String, request: IndiraChatRequest): IndiraChatResponse {
@@ -26,14 +32,23 @@ class MlService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Canal no válido. Use 'web' o 'app'")
         }
 
-        val respuesta = mlClient.chat(
-            MlChatRequest(
-                usuarioId = uuidDeUsuario(username),
-                canal = canal,
-                mensaje = request.mensaje.trim(),
-                conversacionId = request.conversacionId
+        val usuarioId = uuidDeUsuario(username)
+
+        // Cada mensaje a Indira consume 1 token, pedido antes de llamar al ML; si el ML falla, se devuelve.
+        val claveConsumo = consumirMensaje()
+        val respuesta = try {
+            mlClient.chat(
+                MlChatRequest(
+                    usuarioId = usuarioId,
+                    canal = canal,
+                    mensaje = request.mensaje.trim(),
+                    conversacionId = request.conversacionId
+                )
             )
-        )
+        } catch (e: Exception) {
+            claveConsumo?.let { licenciaService.anular(it) }
+            throw e
+        }
 
         return IndiraChatResponse(respuesta.conversacionId, respuesta.mensajeId, respuesta.respuesta)
     }
@@ -78,6 +93,19 @@ class MlService(
                 )
             }
         )
+    }
+
+    /**
+     * Pide 1 token a Sulotec para el mensaje y devuelve la clave del consumo (null si no se consumió: licencias
+     * apagadas, sin sesión o una cuenta sin empresa con UUID).
+     */
+    private fun consumirMensaje(): String? {
+        if (!licenciaService.activo) return null
+        val contexto = licenciaContexto.actual() ?: return null
+        val uuid = contexto.empresaUuid ?: return null
+        val clave = LicenciaReglas.claveAleatoria(uuid, TIPO_MENSAJE_INDIRA)
+        licenciaService.consumirComo(contexto, TIPO_MENSAJE_INDIRA, clave, "mensaje a Indira")
+        return clave
     }
 
     /**

@@ -29,6 +29,14 @@ interface UsuarioRepository : JpaRepository<Usuario, Int> {
 
     fun findAllByEmpresaAndActivoTrueOrderByNombresAscApePatAsc(empresa: String): List<Usuario>
 
+    // Cuentas activas de una empresa (cualquier rol), ignorando mayusculas y espacios: es lo que se reporta a Licencias.
+    @Query("""
+        SELECT COUNT(u) FROM Usuario u
+        WHERE LOWER(TRIM(u.empresa)) = LOWER(TRIM(:empresa))
+          AND u.activo = true
+    """)
+    fun contarActivosPorEmpresa(@Param("empresa") empresa: String): Long
+
     // Nombres de empresa escritos en las cuentas, sin espacios sobrantes (para armar la lista de empresas).
     @Query("""
         SELECT DISTINCT TRIM(u.empresa)

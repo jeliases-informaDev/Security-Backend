@@ -12,19 +12,12 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
-import com.security.modules.creditos.application.service.CreditoService
-import com.security.modules.creditos.domain.AccionCredito
-import com.security.shared.datos.repositories.UsuarioRepository
-import org.springframework.security.core.context.SecurityContextHolder
 
 
 
 @Service
 
 class SubirDocumentosDenunciaUseCase(
-    private val creditoService: CreditoService,
-    private val usuarioRepository: UsuarioRepository,
-
     private val denunciaRepository:
     DenunciaRepository,
 
@@ -111,13 +104,6 @@ class SubirDocumentosDenunciaUseCase(
 
         if (!pinValido) {
             throw credencialesInvalidas()
-        }
-
-        val auth = SecurityContextHolder.getContext().authentication
-        if (auth != null && auth.isAuthenticated && auth.name != "anonymousUser") {
-            usuarioRepository.findByUsuario(auth.name)?.let { user ->
-                creditoService.consumir(user, AccionCredito.DENUNCIA_DOCUMENTOS, "denuncia:archivos:$codigoNormalizado")
-            }
         }
 
         val denunciaId =

@@ -172,7 +172,7 @@ class LicenciaServiceTest {
     @Test
     fun `al administrador de Sulotec nunca se le bloquea`() {
         val s = servicio()
-        every { cliente.consumir(any(), any(), any(), any(), any(), any(), true) } returns
+        every { cliente.consumir(any(), any(), any(), any(), any(), eq(true), any()) } returns
             ConsumoRemoto(permitido = false, motivo = "BOLSA_AGOTADA")
         consumir(s, sulotec = true)
     }

@@ -11,7 +11,7 @@ entonces (`Riesgo Muy Bajo` … `Riesgo Muy Alto`) y no admiten decisión.
 | Pesos de grupos y factores, bandas (Bajo/Medio/Alto), rangos de monto, puntajes fijos (PEP 4, sin coincidencias 1, historial 1), umbral de la regla 5, grupos de Listas Negativas que cuentan como «sanciones o LA/FT», qué hacer por nivel | **Un solo lugar:** `MetodologiaV2.ACTUAL` en `src/main/kotlin/com/security/modules/scoring/domain/metodologia/Metodologia.kt`. Si cambian, sube la `version`. |
 | Puntaje de cada ocupación y departamento | columna `puntaje_v2` de `scoring_ocupacion` y `scoring_departamento` (vacío = sin puntaje). Valor inicial: `src/main/resources/scoring/ocupaciones.csv` y `departamentos.csv`. |
 | Producto, canal y medio de pago | tabla `scoring_opcion` (`tipo` = PRODUCTO / CANAL / MEDIO_PAGO). Valor inicial: `productos.csv`, `canales.csv`, `medios-pago.csv`. |
-| Grupo de cada país y marca del GAFI | tabla `scoring_pais_grupo` (uno por país de la tabla `pais`, con `vigencia`). Valor inicial: `paises.csv`. |
+| Grupo de cada país y marca del GAFI | tabla `scoring_pais_grupo` (uno por país de la tabla `pais`, con `vigencia`). Valor inicial: `paises.csv`. La tabla `pais` se completa al arrancar con `paises-iso.csv` (250 países ISO; agrega los que faltan, no toca los que hay). |
 | El cálculo | `CalculoScoring` (función pura, sin base ni red) y `ClasificadorListas` en el mismo paquete. |
 
 Los catálogos se cargan solos al arrancar (`ScoringCatalogoInicializador`), **también con `APP_SEED_ENABLED` apagado**. Crean lo

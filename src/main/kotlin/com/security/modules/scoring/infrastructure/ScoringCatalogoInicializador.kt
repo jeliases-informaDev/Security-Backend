@@ -5,6 +5,7 @@ import com.security.modules.scoring.domain.ScoringOcupacion
 import com.security.modules.scoring.domain.ScoringOpcion
 import com.security.modules.scoring.domain.ScoringPaisGrupo
 import com.security.modules.scoring.domain.metodologia.CalculoScoring
+import com.security.shared.datos.entities.Pais
 import com.security.shared.datos.repositories.PaisRepository
 import org.slf4j.LoggerFactory
 import org.springframework.boot.ApplicationArguments
@@ -25,8 +26,9 @@ import java.time.LocalDate
  *  - Ocupaciones y departamentos: crea los que faltan (con su puntaje 1-5 de la version 1 y el 1-4 de la
  *    version 2) y completa `puntaje_v2` donde esta vacio. Los puntajes de la version 1 no se tocan.
  *  - Producto, canal y medio de pago: crea los que faltan y completa el puntaje vacio.
- *  - Paises: a cada pais de la tabla `pais` le da su grupo y la marca del GAFI. No crea paises: si un pais del
- *    archivo no existe en la tabla, lo avisa en el log. Una clasificacion del archivo con una vigencia mas nueva
+ *  - Paises: primero completa la tabla `pais` con el catalogo ISO (paises-iso.csv, 250 paises; no toca ni borra los
+ *    que ya estan). Luego a cada pais le da su grupo y la marca del GAFI; si un pais de la clasificacion no existe
+ *    en la tabla, lo avisa en el log. Una clasificacion del archivo con una vigencia mas nueva
  *    que la guardada reemplaza a la guardada (asi se actualiza la lista del GAFI); para un cambio a mano en la
  *    tabla, pon tambien la vigencia del dia del cambio.
  * Un fallo se registra en el log y no impide que la API arranque.
@@ -51,6 +53,7 @@ class ScoringCatalogoInicializador(
         paso("productos") { sembrarOpciones(ScoringOpcion.PRODUCTO, leer("scoring/productos.csv")) }
         paso("canales") { sembrarOpciones(ScoringOpcion.CANAL, leer("scoring/canales.csv")) }
         paso("medios de pago") { sembrarOpciones(ScoringOpcion.MEDIO_PAGO, leer("scoring/medios-pago.csv")) }
+        paso("paises del catalogo ISO") { completarPaises(leer("scoring/paises-iso.csv", ",")) }
         paso("paises") { sembrarPaises(leer("scoring/paises.csv")) }
     }
 
@@ -140,6 +143,21 @@ class ScoringCatalogoInicializador(
         log.info("Scoring: opciones {} nuevas={}, completadas={}", tipo, nuevas, completadas)
     }
 
+    /**
+     * Agrega a la tabla `pais` los paises del catalogo ISO (scoring/paises-iso.csv: alfa2,alfa3,numerico,nombre_es)
+     * que no esten, comparando por nombre normalizado. No toca ni borra los que ya hay; `continente` queda vacio.
+     */
+    internal fun completarPaises(filas: List<List<String>>): Int {
+        val existentes = paisRepository.findAll().mapNotNull { it.nombre?.let { n -> clave(n) } }.toMutableSet()
+        val nuevos = filas
+            .mapNotNull { it.getOrNull(3)?.trim()?.takeIf { n -> n.isNotEmpty() } }
+            .filter { existentes.add(clave(it)) }
+            .map { Pais(nombre = it) }
+        if (nuevos.isNotEmpty()) paisRepository.saveAll(nuevos)
+        log.info("Scoring: paises agregados desde el catalogo ISO={}", nuevos.size)
+        return nuevos.size
+    }
+
     internal fun sembrarPaises(filas: List<List<String>>) {
         val clasificaciones = filas.filter { it[0] != COMODIN }.map { Clasificacion.de(it) }
         val porDefecto = filas.firstOrNull { it[0] == COMODIN }?.let { Clasificacion.de(it) }
@@ -204,12 +222,12 @@ class ScoringCatalogoInicializador(
         fun esSi(texto: String): Boolean = texto.trim().lowercase() in setOf("si", "sí", "true", "1", "x")
 
         /** Filas "a;b;c" de un .csv con encabezado (las columnas vacias quedan como ""). */
-        fun leer(ruta: String): List<List<String>> =
+        fun leer(ruta: String, separador: String = ";"): List<List<String>> =
             ClassPathResource(ruta).inputStream.bufferedReader(Charsets.UTF_8).useLines { lineas ->
                 lineas.drop(1)
-                    .map { it.removePrefix("﻿") }
+                    .map { it.removePrefix("\uFEFF") }
                     .filter { it.isNotBlank() }
-                    .map { linea -> linea.split(";").map { it.trim() } }
+                    .map { linea -> linea.split(separador).map { it.trim() } }
                     .toList()
             }
     }

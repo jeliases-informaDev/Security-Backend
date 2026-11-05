@@ -147,4 +147,45 @@ class ScoringCatalogoInicializadorTest {
         assertEquals(1, r.noticias)
         assertEquals(4, ClasificadorListas.condicion(m, r).puntaje)
     }
+
+    @Test
+    fun `una tabla de paises incompleta se completa con el catalogo ISO y todos quedan clasificados`() {
+        // Como en produccion: la tabla tenia solo algunos paises (aqui, nombres sin tildes del seed de desarrollo)
+        val tabla = mutableListOf(Pais(id = 1, nombre = "Peru"), Pais(id = 2, nombre = "Mexico"), Pais(id = 3, nombre = "Estados Unidos"))
+        every { paises.findAll() } answers { tabla.toList() }
+        every { paises.saveAll(any<List<Pais>>()) } answers {
+            firstArg<List<Pais>>().onEach { it.id = tabla.size + 1; tabla.add(it) }
+        }
+        val clasificados = mutableListOf<ScoringPaisGrupo>()
+        every { paisGrupos.todosConPais() } answers { clasificados.toList() }
+        every { paisGrupos.save(any<ScoringPaisGrupo>()) } answers { firstArg<ScoringPaisGrupo>().also { clasificados.add(it) } }
+
+        val iso = ScoringCatalogoInicializador.leer("scoring/paises-iso.csv", ",")
+        assertEquals(250, iso.size)
+        assertEquals(247, inicializador.completarPaises(iso))
+        assertEquals(250, tabla.size)
+        // Idempotente: una segunda corrida no agrega nada
+        assertEquals(0, inicializador.completarPaises(iso))
+
+        val clasificacion = ScoringCatalogoInicializador.leer("scoring/paises.csv")
+        inicializador.sembrarPaises(clasificacion)
+        assertEquals(250, clasificados.size)
+
+        fun grupoDe(nombre: String) = clasificados.single { it.pais.nombre == nombre }
+        assertEquals(4, grupoDe("Corea del Norte").grupo)
+        assertEquals(true, grupoDe("Corea del Norte").altoRiesgoGafi)
+        assertEquals(4, grupoDe("Myanmar (Birmania)").grupo)
+        assertEquals(true, grupoDe("Myanmar (Birmania)").altoRiesgoGafi)
+        assertEquals(1, grupoDe("Peru").grupo)
+        assertEquals(2, grupoDe("Mexico").grupo)
+        assertEquals(3, grupoDe("Estados Unidos").grupo)
+
+        // Ningun pais de la clasificacion queda sin emparejar con el catalogo ISO
+        val claves = tabla.mapNotNull { it.nombre }.map { ScoringCatalogoInicializador.clave(it) }.toSet()
+        val sinEmparejar = clasificacion.filter { it[0] != ScoringCatalogoInicializador.COMODIN }.filter { fila ->
+            (listOf(fila[0]) + fila[4].split("|").filter { it.isNotBlank() }).none { ScoringCatalogoInicializador.clave(it) in claves }
+        }.map { it[0] }
+        assertEquals(emptyList(), sinEmparejar)
+    }
 }
+

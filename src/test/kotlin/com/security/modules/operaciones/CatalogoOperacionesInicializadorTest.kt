@@ -10,13 +10,16 @@ import com.security.modules.scoring.infrastructure.ScoringDepartamentoRepository
 import com.security.shared.datos.entities.Pais
 import io.mockk.*
 import org.junit.jupiter.api.Test
+import org.springframework.boot.DefaultApplicationArguments
+import org.springframework.transaction.PlatformTransactionManager
 import kotlin.test.*
 
 class CatalogoOperacionesInicializadorTest {
     private val monedas = mockk<MonedaRepository>()
     private val provincias = mockk<ProvinciaRepository>()
     private val departamentos = mockk<ScoringDepartamentoRepository>()
-    private val inicializador = CatalogoOperacionesInicializador(monedas, provincias, departamentos)
+    private val transacciones = mockk<PlatformTransactionManager>(relaxed = true)
+    private val inicializador = CatalogoOperacionesInicializador(monedas, provincias, departamentos, transacciones)
 
     private val peru = mockk<Pais>(relaxed = true)
     private fun departamento(nombre: String) = ScoringDepartamento(pais = peru, nombre = nombre, puntaje = 1)
@@ -77,5 +80,25 @@ class CatalogoOperacionesInicializadorTest {
         assertEquals(0, inicializador.sembrarProvincias(inicializador.leerProvincias()))
 
         verify(exactly = 0) { provincias.saveAll(any<List<Provincia>>()) }
+    }
+
+    @Test
+    fun `al arrancar con provincias ya guardadas siembra dentro de una transaccion`() {
+        // En produccion las provincias guardadas traen su departamento perezoso: leer su nombre exige una sesion abierta.
+        val junin = departamento("Junin")
+        every { monedas.findAll() } returns CatalogoOperacionesInicializador.MONEDAS.map { Moneda(codigo = it.codigo, nombre = it.nombre) }
+        every { departamentos.findAll() } returns listOf(junin)
+        every { provincias.findAll() } returns listOf(Provincia(nombre = "Huancayo", departamento = junin))
+        val guardadas = slot<List<Provincia>>()
+        every { provincias.saveAll(capture(guardadas)) } answers { firstArg() }
+
+        inicializador.run(DefaultApplicationArguments())
+
+        verify(exactly = 2) { transacciones.getTransaction(any()) }
+        verify(exactly = 2) { transacciones.commit(any()) }
+        // Las de Junin que faltaban (el archivo trae 9) y ninguna repetida
+        assertEquals(8, guardadas.captured.size)
+        assertTrue(guardadas.captured.all { it.departamento === junin })
+        assertTrue(guardadas.captured.none { it.nombre == "Huancayo" })
     }
 }

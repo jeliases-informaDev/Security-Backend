@@ -1,4 +1,4 @@
-# Registro de Operaciones (diseño nuevo, entrega A)
+# Registro de Operaciones (diseño nuevo, entregas A y B)
 
 Qué hace el módulo, con qué reglas, y qué queda para la entrega B. El contrato completo con ejemplos JSON lo tiene quien hace
 las pantallas (`CONTRATO-OPERACIONES.md`); aquí va lo esencial. Reemplaza a `REGISTRO-OPERACION.md`, que describe el modelo
@@ -82,8 +82,53 @@ de un registro anterior), responsable, lista e indicadores, **acceso cruzado en 
 y `RegistroOperacionesMysqlTest`, que corre contra la MySQL del CI: lista, filtros e indicadores separados por empresa, numerador con
 altas simultáneas, índice único por empresa, esquema e historial.
 
-## Queda para la entrega B (no hay rutas ni tablas a medio hacer)
+## Entrega B
 
-Sector y umbrales con verificación (RO 16 y la tarjeta «Umbral» de RO 2–5), tipo de cambio, filtro de monto en US$, oficinas como
-lista de la empresa, marcar como inusual y análisis (RO 12; pestaña «Análisis» del historial), preparar el ROS (RO 13). La
-exportación a la UIF (RO 14, RO 15) y el estado «Enviado» esperan el formato oficial. Mientras tanto todo registro está «Pendiente».
+Contrato completo: `CONTRATO-OPERACIONES-B.md` (lo tiene quien hace las pantallas). Ninguna ruta de la B consume tokens.
+
+| Pantalla | Ruta (bajo `/api/operaciones`) | Quién |
+|---|---|---|
+| Sector, umbrales y oficinas (RO 16) | `GET`/`PUT /configuracion` | ver: todos · guardar: administrador |
+| Tipo de cambio mensual | `GET`/`PUT /tipos-cambio` | ver: todos · cargar: administrador |
+| Verificación de umbral (RO 2–5) | `POST /verificar-umbral` (y al registrar y editar) | todos |
+| Marcar como inusual (RO 12) | `GET`/`PUT /{id}/inusualidad`, `POST /{id}/inusualidad/adjuntos`, `GET …/adjuntos/{adjuntoId}` | todos |
+| Calificar | `POST /{id}/inusualidad/decision` | administrador |
+| Preparar el ROS (RO 13) | `GET`/`PUT /{id}/ros` | ver: todos · registrar: administrador |
+| Exportar (RO 14, RO 15) | `GET /exportaciones/validacion`, `POST /exportaciones`, `GET /exportaciones`, `GET /exportaciones/{id}`, `GET /exportaciones/{id}/archivo?tipo=xlsx\|csv`, `POST /exportaciones/{id}/constancia`, `GET /exportaciones/{id}/constancia/archivo` | ver: todos · generar y constancia: administrador |
+
+«Administrador» = el administrador de la empresa (`ADMINISTRADOR_EMPRESA`) o el universal de Sulotec, hasta que exista el rol de
+oficial de cumplimiento; si no, 403 `OPERACIONES_SOLO_ADMINISTRADOR`.
+
+Reglas de la B:
+
+- **Sector y umbrales:** los sectores son los 12 de la ficha de RO 16. Solo «Construcción y/o inmobiliaria» tiene umbrales cargados
+  (`umbral_operaciones`, sembrado desde `operaciones/umbrales-norma.csv`: lotes de terreno US$ 30 000; vivienda, oficinas, uso
+  comercial, uso público y estacionamientos US$ 100 000, con los nombres del diseño). Los demás sectores quedan «Por configurar»: no
+  se inventan umbrales. El tipo de bien sale del tipo de operación (columna `tipo_bien` del catálogo). El umbral interno es opcional,
+  menor que el mayor de la norma y con motivo. Las oficinas configuradas pasan a ser la lista del formulario.
+- **Tipo de cambio:** soles por unidad, promedio de venta del mes, cargado a mano (el de la empresa manda sobre el de Sulotec). Una
+  operación del mes M usa el del mes M−1. Si falta, la verificación dice «Falta el tipo de cambio de <mes>» y **no bloquea** el
+  registro. PLAFT no lo trae de ningún lado.
+- **Verificación de umbral:** se calcula y se guarda con el registro (estado, monto en US$, tipos de cambio usados, umbral, tipo de
+  bien, sector) al registrar y al editar; evento `UMBRAL` en el historial (del sistema). Es informativa.
+- **Inusual y ROS:** un análisis por registro: `EN_ANALISIS` → `DESCARTADA` o `SOSPECHOSA` (una sola decisión, con el «Análisis y
+  evaluación» escrito). Sospechosa abre un plazo de 24 horas para registrar el número de ROS (una sola vez). El envío del ROS es en
+  ROSEL, fuera de PLAFT. Adjuntos PDF, DOC o DOCX hasta 10 MB en el almacenamiento de las denuncias; no se borran. Todo va al
+  historial como `ANALISIS`.
+- **Estado del registro:** `INUSUAL` (en análisis o sospechosa), si no `ENVIADO` (con constancia), si no `PENDIENTE`. Lista,
+  pestañas, filtros (estado, oficina, monto en US$) e indicadores (enviados, inusuales en análisis, sospechosas) lo usan.
+- **Exportación:** formato interno «RO a disposición de la UIF» (Excel con hoja «Léeme» y CSV UTF-8 con `;`), una fila por operación
+  del periodo (mes de la fecha de la operación) pendiente de envío. **No es una plantilla oficial de la SBS**: la SBS no publica una
+  para este sector. Los cuatro formatos de la SBS quedan «Pronto». La validación lista lo que falta por registro (se puede generar
+  igual). Los archivos se guardan al generarlos. La constancia (fecha, N.º de acuse, notas, adjunto opcional) pasa a `ENVIADO` los
+  registros de esa exportación y anota `ENVIO` en su historial; una sola vez.
+
+Tablas nuevas de la B: `umbral_operaciones`, `configuracion_operaciones` (+ `_oficinas`), `tipo_cambio_operaciones`,
+`analisis_operaciones`, `analisis_operaciones_adjuntos`, `exportacion_operaciones` (+ `_registros`). Columnas nuevas:
+`operaciones_v2` (`umbral_estado`, `umbral_usd`, `umbral_norma_usd`, `umbral_interno`, `tipo_bien`, `sector`, `monto_usd`, `tc_mes`,
+`tc_usd`, `tc_moneda`, `umbral_verificado_en`), `registro_operaciones_v2` (`id_exportacion_envio`, `fecha_envio`) y
+`catalogo_operaciones.tipo_bien`. Todo opcional; lo crea Hibernate.
+
+Sigue «Pronto»: los formatos oficiales de la SBS, la carga automática del tipo de cambio, más de un RO por actividad, umbrales y tipos
+de operación de los otros sectores, la plantilla ROSEL y el rol de oficial de cumplimiento. Conservación: se muestra 5 años (el
+diseño); el reglamento habla de 10 y la norma sectorial de 5: está por confirmar con la UIF.

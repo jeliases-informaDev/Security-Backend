@@ -1,39 +1,73 @@
-catalogo;codigo;nombre;orden;pide_texto;sector
-TIPO_DOCUMENTO;DNI;DNI;1;false;
-TIPO_DOCUMENTO;CE;CE (carné de extranjería);2;false;
-TIPO_DOCUMENTO;PASAPORTE;PASAPORTE;3;false;
-TIPO_DOCUMENTO;RUC;RUC;4;false;
-TIPO_DOCUMENTO;SIN_DOCUMENTO;SIN DOCUMENTO;5;true;
-ESTADO_CIVIL;SOLTERO;Soltero(a);1;false;
-ESTADO_CIVIL;CASADO;Casado(a);2;false;
-ESTADO_CIVIL;CONVIVIENTE;Conviviente;3;false;
-ESTADO_CIVIL;VIUDO;Viudo(a);4;false;
-ESTADO_CIVIL;DIVORCIADO;Divorciado(a);5;false;
-MODALIDAD_PAGO;EFECTIVO;Efectivo;1;false;
-MODALIDAD_PAGO;TRANSFERENCIA_BANCARIA;Transferencia bancaria;2;false;
-MODALIDAD_PAGO;CHEQUE_GERENCIA;Cheque de gerencia;3;false;
-MODALIDAD_PAGO;CHEQUE;Cheque;4;false;
-MODALIDAD_PAGO;TARJETA;Tarjeta de crédito o débito;5;false;
-MODALIDAD_PAGO;CREDITO_BANCARIO;Crédito o financiamiento bancario;6;false;
-MODALIDAD_PAGO;DEPOSITO_CUENTA;Depósito en cuenta;7;false;
-MODALIDAD_PAGO;PAGO_TERCERO;Pago de un tercero;8;false;
-MODALIDAD_PAGO;OTRO;Otro (especificar);9;true;
-ORIGEN_FONDOS;AHORROS;Ahorros;1;false;
-ORIGEN_FONDOS;VENTA_BIEN;Venta de un bien;2;false;
-ORIGEN_FONDOS;PRESTAMO;Préstamo o financiamiento;3;false;
-ORIGEN_FONDOS;HERENCIA_DONACION;Herencia o donación;4;false;
-ORIGEN_FONDOS;TRABAJO_DEPENDIENTE;Ingresos por trabajo dependiente;5;false;
-ORIGEN_FONDOS;NEGOCIO_PROPIO;Ingresos de negocio propio;6;false;
-ORIGEN_FONDOS;OTRO;Otro (especificar);7;true;
-TIPO_OPERACION;COMPRA_LOTE;Compra de lote de terreno;1;false;INMOBILIARIO
-TIPO_OPERACION;VENTA_LOTE;Venta de lote de terreno;2;false;INMOBILIARIO
-TIPO_OPERACION;COMPRA_VIVIENDA;Compra de vivienda;3;false;INMOBILIARIO
-TIPO_OPERACION;VENTA_VIVIENDA;Venta de vivienda;4;false;INMOBILIARIO
-TIPO_OPERACION;COMPRA_DEPARTAMENTO;Compra de departamento;5;false;INMOBILIARIO
-TIPO_OPERACION;VENTA_DEPARTAMENTO;Venta de departamento;6;false;INMOBILIARIO
-TIPO_OPERACION;COMPRA_OFICINA;Compra de oficina;7;false;INMOBILIARIO
-TIPO_OPERACION;VENTA_OFICINA;Venta de oficina;8;false;INMOBILIARIO
-TIPO_OPERACION;COMPRA_LOCAL_COMERCIAL;Compra de local comercial;9;false;INMOBILIARIO
-TIPO_OPERACION;VENTA_LOCAL_COMERCIAL;Venta de local comercial;10;false;INMOBILIARIO
-TIPO_OPERACION;COMPRA_ESTACIONAMIENTO;Compra de estacionamiento;11;false;INMOBILIARIO
-TIPO_OPERACION;VENTA_ESTACIONAMIENTO;Venta de estacionamiento;12;false;INMOBILIARIO
+catalogo;codigo;nombre;orden;pide_texto;sector;tipo_bien
+TIPO_DOCUMENTO;DNI;DNI;1;false;;
+TIPO_DOCUMENTO;CE;CE (carné de extranjería);2;false;;
+TIPO_DOCUMENTO;PASAPORTE;PASAPORTE;3;false;;
+TIPO_DOCUMENTO;RUC;RUC;4;false;;
+TIPO_DOCUMENTO;SIN_DOCUMENTO;SIN DOCUMENTO;5;true;;
+ESTADO_CIVIL;SOLTERO;Soltero(a);1;false;;
+ESTADO_CIVIL;CASADO;Casado(a);2;false;;
+ESTADO_CIVIL;CONVIVIENTE;Conviviente;3;false;;
+ESTADO_CIVIL;VIUDO;Viudo(a);4;false;;
+ESTADO_CIVIL;DIVORCIADO;Divorciado(a);5;false;;
+MODALIDAD_PAGO;EFECTIVO;Efectivo;1;false;;
+MODALIDAD_PAGO;TRANSFERENCIA_BANCARIA;Transferencia bancaria;2;false;;
+MODALIDAD_PAGO;CHEQUE_GERENCIA;Cheque de gerencia;3;false;;
+MODALIDAD_PAGO;CHEQUE;Cheque;4;false;;
+MODALIDAD_PAGO;TARJETA;Tarjeta de crédito o débito;5;false;;
+MODALIDAD_PAGO;CREDITO_BANCARIO;Crédito o financiamiento bancario;6;false;;
+MODALIDAD_PAGO;DEPOSITO_CUENTA;Depósito en cuenta;7;false;;
+MODALIDAD_PAGO;PAGO_TERCERO;Pago de un tercero;8;false;;
+MODALIDAD_PAGO;OTRO;Otro (especificar);9;true;;
+ORIGEN_FONDOS;AHORROS;Ahorros;1;false;;
+ORIGEN_FONDOS;VENTA_BIEN;Venta de un bien;2;false;;
+ORIGEN_FONDOS;PRESTAMO;Préstamo o financiamiento;3;false;;
+ORIGEN_FONDOS;HERENCIA_DONACION;Herencia o donación;4;false;;
+ORIGEN_FONDOS;TRABAJO_DEPENDIENTE;Ingresos por trabajo dependiente;5;false;;
+ORIGEN_FONDOS;NEGOCIO_PROPIO;Ingresos de negocio propio;6;false;;
+ORIGEN_FONDOS;OTRO;Otro (especificar);7;true;;
+TIPO_OPERACION;COMPRA_LOTE;Compra de lote de terreno;1;false;INMOBILIARIO;LOTE_TERRENO
+TIPO_OPERACION;VENTA_LOTE;Venta de lote de terreno;2;false;INMOBILIARIO;LOTE_TERRENO
+TIPO_OPERACION;COMPRA_VIVIENDA;Compra de vivienda;3;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;VENTA_VIVIENDA;Venta de vivienda;4;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;COMPRA_DEPARTAMENTO;Compra de departamento;5;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;VENTA_DEPARTAMENTO;Venta de departamento;6;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;COMPRA_OFICINA;Compra de oficina;7;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;VENTA_OFICINA;Venta de oficina;8;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;COMPRA_LOCAL_COMERCIAL;Compra de local comercial;9;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;VENTA_LOCAL_COMERCIAL;Venta de local comercial;10;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;COMPRA_ESTACIONAMIENTO;Compra de estacionamiento;11;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+TIPO_OPERACION;VENTA_ESTACIONAMIENTO;Venta de estacionamiento;12;false;INMOBILIARIO;UNIDAD_INMOBILIARIA
+SECTOR;AGENTE_INMOBILIARIO;Agente inmobiliario;1;false;;
+SECTOR;CONSTRUCCION_INMOBILIARIA;Construcción y/o inmobiliaria;2;false;INMOBILIARIO;
+SECTOR;MAQUINARIAS_EQUIPOS;Comercialización de maquinarias y equipos (subpartidas nacionales);3;false;;
+SECTOR;JOYAS_METALES_MINERIA;Comercio de joyas, metales preciosos y/o piedras preciosas, y empresas mineras;4;false;;
+SECTOR;COMPRAVENTA_DIVISAS;Compraventa de divisas;5;false;;
+SECTOR;VEHICULOS_EMBARCACIONES;Compraventa de vehículos y embarcaciones;6;false;;
+SECTOR;MONEDAS_ARTE_LOTERIAS;Comercio de monedas, objetos de arte y sellos postales; aeronaves, hipódromos y juegos de lotería;7;false;;
+SECTOR;OSFL;Organización sin fines de lucro (OSFL);8;false;;
+SECTOR;PRESTAMO_EMPENO;Préstamo y/o empeño;9;false;;
+SECTOR;ABOGADOS_CONTADORES;Abogados y contadores independientes;10;false;;
+SECTOR;NOTARIOS;Notarios (norma especial);11;false;;
+SECTOR;OTRO_SUJETO_OBLIGADO;Otro sujeto obligado;12;false;;
+SENAL_ALERTA;PAGO_FRACCIONADO;Pago fraccionado sin justificación;1;false;;
+SENAL_ALERTA;ORIGEN_INCONSISTENTE;Origen de fondos inconsistente;2;false;;
+SENAL_ALERTA;NIEGA_INFORMACION;El cliente se niega a dar información;3;false;;
+SENAL_ALERTA;DOCUMENTOS_INCONSISTENTES;Documentos adulterados o inconsistentes;4;false;;
+SENAL_ALERTA;PAGOS_TERCEROS;Pagos de terceros sin vínculo aparente;5;false;;
+SENAL_ALERTA;SOLO_EFECTIVO;Efectivo como único medio de pago;6;false;;
+SENAL_ALERTA;INCOMPATIBLE_PERFIL;Operación incompatible con el perfil del cliente;7;false;;
+SENAL_ALERTA;LISTAS_NEGATIVAS;Coincidencia en listas negativas;8;false;;
+SENAL_ALERTA;VINCULADO_INVESTIGACION;Cliente vinculado a una investigación;9;false;;
+SENAL_ALERTA;OTRA;Otra (describir);10;true;;
+FUENTE_SENAL;REVISION_INTERNA;Revisión interna;1;false;;
+FUENTE_SENAL;LISTAS_NEGATIVAS;Listas negativas;2;false;;
+FUENTE_SENAL;NOTICIAS;Noticias en medios;3;false;;
+FUENTE_SENAL;ALERTA_SISTEMA;Alerta del sistema;4;false;;
+FUENTE_SENAL;AVISO_TRABAJADOR;Aviso de un trabajador;5;false;;
+FUENTE_SENAL;REQUERIMIENTO_AUTORIDAD;Requerimiento de una autoridad;6;false;;
+FORMATO_EXPORTACION;DISPOSICION_UIF;RO a disposición de la UIF (Excel y CSV);1;false;;
+FORMATO_EXPORTACION;SISTEMA_FINANCIERO;RO del sistema financiero;2;false;;
+FORMATO_EXPORTACION;COOPAC;RO de COOPAC;3;false;;
+FORMATO_EXPORTACION;NOTARIOS;RO de notarios;4;false;;
+FORMATO_EXPORTACION;COMPRAVENTA_DIVISAS;RO de compraventa de divisas;5;false;;
+NOTA_UMBRAL;INMOBILIARIO;Se toma la fecha del contrato de compraventa. Cuenta el monto total y también los pagos parciales que superen el umbral.;1;false;;

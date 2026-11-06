@@ -48,6 +48,13 @@ class RegistroOperacionesEntity(
     @Column(name = "id_usuario_responsable")
     var idUsuarioResponsable: Int? = null,
 
+    // Entrega B: constancia de envio (la exportacion y su fecha); null = pendiente de envio
+    @Column(name = "id_exportacion_envio")
+    var idExportacionEnvio: Long? = null,
+
+    @Column(name = "fecha_envio")
+    var fechaEnvio: LocalDate? = null,
+
     beneficiarios: List<BeneficiarioEntity> = emptyList()
 ) {
     // Mantener la colección administrada por Hibernate permite eliminar los huérfanos.

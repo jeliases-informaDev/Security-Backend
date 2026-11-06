@@ -10,14 +10,20 @@ import org.springframework.stereotype.Service
 @Transactional(readOnly = true)
 class CatalogoService(
     private val catalogoRepository: CatalogoRepository,
-    private val catalogosRegistro: CatalogosRegistro? = null
+    private val catalogosRegistro: CatalogosRegistro? = null,
+    private val acceso: AccesoEmpresaService? = null,
+    private val configuracion: ConfiguracionOperacionesService? = null
 ) {
 
     fun catalogos(): CatalogosOperacionResponse {
         val registro = catalogosRegistro?.cargar()
         fun lista(catalogo: String) = registro?.de(catalogo).orEmpty().map {
-            com.security.modules.operaciones.dto.OpcionRegistroResponse(it.codigo, it.nombre, it.pideTexto, it.sector)
+            com.security.modules.operaciones.dto.OpcionRegistroResponse(it.codigo, it.nombre, it.pideTexto, it.sector, it.tipoBien)
         }
+        // La configuracion de la empresa de quien pide (oficinas y grupo de tipos de operacion); sin empresa, la de siempre.
+        val empresa = runCatching { acceso?.actor()?.empresa }.getOrNull()
+        val config = if (empresa != null && registro != null) configuracion?.de(empresa, registro) else null
+        val grupo = config?.takeIf { !it.porConfigurar }?.grupo ?: CatalogosOperacion.SECTOR_POR_DEFECTO
         return CatalogosOperacionResponse(
             monedas = catalogoRepository.monedas(),
             ocupaciones = catalogoRepository.ocupaciones(),
@@ -29,9 +35,15 @@ class CatalogoService(
             modalidadesPago = lista(CatalogosOperacion.MODALIDAD_PAGO),
             origenesFondos = lista(CatalogosOperacion.ORIGEN_FONDOS),
             // Hasta que la empresa tenga sector (entrega B), los del sector inmobiliario.
-            tiposOperacion = lista(CatalogosOperacion.TIPO_OPERACION)
-                .filter { it.sector == null || it.sector == CatalogosOperacion.SECTOR_POR_DEFECTO },
-            tipoDocumentoInicial = CatalogosOperacion.DOCUMENTO_INICIAL
+            tiposOperacion = lista(CatalogosOperacion.TIPO_OPERACION).filter { it.sector == null || it.sector == grupo },
+            tipoDocumentoInicial = CatalogosOperacion.DOCUMENTO_INICIAL,
+            sectores = lista(CatalogosOperacion.SECTOR),
+            senalesAlerta = lista(CatalogosOperacion.SENAL_ALERTA),
+            fuentesSenal = lista(CatalogosOperacion.FUENTE_SENAL),
+            formatosExportacion = lista(CatalogosOperacion.FORMATO_EXPORTACION)
+                .map { it.copy(disponible = it.codigo == CatalogosOperacion.FORMATO_DISPOSICION) },
+            oficinas = config?.oficinas.orEmpty(),
+            tiposOperacionPorConfigurar = config == null || config.porConfigurar
         )
     }
 

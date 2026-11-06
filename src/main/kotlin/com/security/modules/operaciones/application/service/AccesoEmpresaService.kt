@@ -4,6 +4,7 @@ import com.security.modules.operaciones.domain.RegistroOperacionesEntity
 import com.security.modules.operaciones.infraestructure.OperacionRepository
 import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.exceptions.ResourceNotFoundException
+import com.security.shared.security.ROL_ADMINISTRADOR_EMPRESA
 import com.security.shared.security.esAdministrador
 import com.tuempresa.operaciones.dto.RegistroDto
 import org.springframework.http.HttpStatus
@@ -29,9 +30,13 @@ class AccesoEmpresaService(
         val usuario: String,
         val empresa: String?,
         val esAdministrador: Boolean,
-        val nombreCompleto: String = usuario
+        val nombreCompleto: String = usuario,
+        val esAdministradorEmpresa: Boolean = false
     ) {
         fun autor() = AutorEvento(id, usuario, nombreCompleto)
+
+        /** Configurar, calificar, registrar el ROS, exportar: el administrador de la empresa o el universal de Sulotec. */
+        val puedeAdministrar: Boolean get() = esAdministrador || esAdministradorEmpresa
     }
 
     @Transactional(readOnly = true)
@@ -48,7 +53,9 @@ class AccesoEmpresaService(
             usuario = cuenta.usuario,
             empresa = limpiar(cuenta.empresa),
             esAdministrador = autenticacion.esAdministrador(),
-            nombreCompleto = nombreCompleto(cuenta)
+            nombreCompleto = nombreCompleto(cuenta),
+            esAdministradorEmpresa = autenticacion.authorities.any { it.authority == "ROLE_$ROL_ADMINISTRADOR_EMPRESA" } ||
+                cuenta.roles.any { it.rol.activo && it.rol.codigo.trim().equals(ROL_ADMINISTRADOR_EMPRESA, ignoreCase = true) }
         )
     }
 
@@ -103,6 +110,16 @@ class AccesoEmpresaService(
     fun empresaDelRegistro(registro: RegistroOperacionesEntity): String =
         usuarioRepository.findById(registro.idUsuario).orElse(null)?.let { limpiar(it.empresa) }
             ?: registro.empresa.trim()
+
+    /** Lanza 403 OPERACIONES_SOLO_ADMINISTRADOR si quien pide no es administrador; devuelve el actor. */
+    fun administrador(): Actor {
+        val actor = actor()
+        if (!actor.puedeAdministrar) {
+            throw OperacionesException(HttpStatus.FORBIDDEN, CodigosOperaciones.SOLO_ADMINISTRADOR,
+                "Esta acción es solo para el administrador de la empresa.")
+        }
+        return actor
+    }
 
     private fun limpiar(valor: String?): String? = valor?.trim()?.takeIf { it.isNotEmpty() }
 

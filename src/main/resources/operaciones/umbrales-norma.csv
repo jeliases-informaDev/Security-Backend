@@ -1,0 +1,3 @@
+grupo;tipo_bien;nombre;umbral_usd;orden
+INMOBILIARIO;LOTE_TERRENO;Lotes de terreno;30000.00;1
+INMOBILIARIO;UNIDAD_INMOBILIARIA;Vivienda, oficinas, uso comercial, uso público y estacionamientos;100000.00;2

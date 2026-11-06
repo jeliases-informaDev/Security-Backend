@@ -22,7 +22,11 @@ data class ParametrosLista(
     val moneda: String? = null,
     val responsableId: Int? = null,
     val sinResponsable: Boolean? = null,
-    val estado: String? = null
+    val estado: String? = null,
+    val estados: List<String> = emptyList(),
+    val oficina: String? = null,
+    val montoMinUsd: java.math.BigDecimal? = null,
+    val montoMaxUsd: java.math.BigDecimal? = null
 )
 
 /** Lista (RO 1, buscador y filtros de RO 11) e indicadores, siempre de una sola empresa (la decide el controlador). */
@@ -63,7 +67,11 @@ class ListaOperacionesService(
                 moneda = f.moneda,
                 monedaCodigo = moneda?.codigo,
                 monedaSimbolo = moneda?.simbolo,
-                estado = ESTADO_PENDIENTE
+                estado = estadoRegistro(f.estadoAnalisis, f.fechaEnvio),
+                estadoEnvio = if (f.fechaEnvio != null) ESTADO_ENVIADO else ESTADO_PENDIENTE,
+                inusualidad = f.estadoAnalisis ?: "SIN_ANALISIS",
+                montoUsd = f.montoUsd,
+                umbralEstado = f.umbralEstado
             )
         }
         val paginas = if (total == 0L) 0 else ((total + size - 1) / size).toInt()
@@ -79,20 +87,24 @@ class ListaOperacionesService(
             }
         } ?: YearMonth.now(ZONA_LIMA)
         val c = consulta.conteos(empresa.trim(), mes.atDay(1), mes.atEndOfMonth())
-        // En la entrega A ningun registro se envia a la UIF: todos estan pendientes de envio.
-        return IndicadoresOperacionesResponse(mes.toString(), c.delPeriodo, c.total, c.sinResponsable, c.total)
+        return IndicadoresOperacionesResponse(
+            periodo = mes.toString(), registrosDelPeriodo = c.delPeriodo, pendientesDeEnvio = c.total - c.enviados,
+            sinResponsable = c.sinResponsable, total = c.total, enviados = c.enviados,
+            inusualesEnAnalisis = c.inusuales, sospechosas = c.sospechosas
+        )
     }
 
     private fun filtros(p: ParametrosLista, cat: Catalogos): FiltrosOperaciones {
         fun invalido(mensaje: String): Nothing =
             throw OperacionesException(HttpStatus.BAD_REQUEST, CodigosOperaciones.FILTRO_INVALIDO, mensaje)
 
-        when (p.estado?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }) {
-            null, ESTADO_PENDIENTE -> Unit
-            "ENVIADO", "INUSUAL" -> throw OperacionesException(HttpStatus.BAD_REQUEST, CodigosOperaciones.FILTRO_PRONTO,
-                "El estado de envío y el análisis de inusualidad llegan con la próxima entrega")
-            else -> invalido("El estado debe ser PENDIENTE")
+        // estado puede repetirse o ir separado por comas: PENDIENTE (sin constancia), ENVIADO, INUSUAL (en analisis o sospechosa)
+        val estados = (listOfNotNull(p.estado) + p.estados)
+            .flatMap { it.split(",") }.map { it.trim().uppercase() }.filter { it.isNotEmpty() }.toSet()
+        estados.firstOrNull { it !in setOf(ESTADO_PENDIENTE, ESTADO_ENVIADO, ESTADO_INUSUAL) }?.let {
+            invalido("El estado debe ser PENDIENTE, ENVIADO o INUSUAL")
         }
+        if (p.montoMinUsd != null && p.montoMaxUsd != null && p.montoMinUsd > p.montoMaxUsd) invalido("El monto mínimo es mayor que el máximo")
         if (p.desde != null && p.hasta != null && p.desde.isAfter(p.hasta)) invalido("La fecha «desde» es posterior a «hasta»")
 
         // Un codigo encuentra tambien los registros viejos que guardaron el nombre escrito.
@@ -113,7 +125,11 @@ class ListaOperacionesService(
             moneda = moneda?.codigo,
             monedaId = moneda?.id,
             responsableId = p.responsableId,
-            sinResponsable = p.sinResponsable == true
+            sinResponsable = p.sinResponsable == true,
+            estados = estados,
+            oficina = p.oficina?.trim()?.takeIf { it.isNotEmpty() },
+            montoMinUsd = p.montoMinUsd,
+            montoMaxUsd = p.montoMaxUsd
         )
     }
 

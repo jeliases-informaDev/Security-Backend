@@ -8,7 +8,14 @@ data class DepartamentoOpcionResponse(val id: Long, val nombre: String, val idPa
 
 /** Opcion de los catalogos del formulario nuevo; `sector` solo en los tipos de operacion. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-data class OpcionRegistroResponse(val codigo: String, val nombre: String, val pideTexto: Boolean, val sector: String? = null)
+data class OpcionRegistroResponse(
+    val codigo: String,
+    val nombre: String,
+    val pideTexto: Boolean,
+    val sector: String? = null,
+    val tipoBien: String? = null,
+    val disponible: Boolean? = null
+)
 
 data class CatalogosOperacionResponse(
     val monedas: List<MonedaOpcionResponse>,
@@ -21,5 +28,11 @@ data class CatalogosOperacionResponse(
     val modalidadesPago: List<OpcionRegistroResponse> = emptyList(),
     val origenesFondos: List<OpcionRegistroResponse> = emptyList(),
     val tiposOperacion: List<OpcionRegistroResponse> = emptyList(),
-    val tipoDocumentoInicial: String = "DNI"
+    val tipoDocumentoInicial: String = "DNI",
+    val sectores: List<OpcionRegistroResponse> = emptyList(),
+    val senalesAlerta: List<OpcionRegistroResponse> = emptyList(),
+    val fuentesSenal: List<OpcionRegistroResponse> = emptyList(),
+    val formatosExportacion: List<OpcionRegistroResponse> = emptyList(),
+    val oficinas: List<String> = emptyList(),
+    val tiposOperacionPorConfigurar: Boolean = false
 )

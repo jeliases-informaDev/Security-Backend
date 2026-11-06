@@ -3,6 +3,9 @@ package com.security.modules.operaciones.application.service
 import com.security.modules.operaciones.domain.CatalogoOperacionEntity
 import com.security.modules.operaciones.domain.Moneda
 import com.security.modules.operaciones.infraestructure.CatalogoOperacionRepository
+import com.security.modules.operaciones.infraestructure.UmbralNormaRepository
+import com.security.modules.operaciones.domain.UmbralNormaEntity
+import java.math.BigDecimal
 import com.security.modules.operaciones.domain.Provincia
 import com.security.modules.operaciones.infraestructure.MonedaRepository
 import com.security.modules.operaciones.infraestructure.ProvinciaRepository
@@ -34,7 +37,8 @@ class CatalogoOperacionesInicializador(
     private val departamentoRepository: ScoringDepartamentoRepository,
     transactionManager: PlatformTransactionManager,
     // Opciones del formulario nuevo (modalidad, origen de fondos, estado civil, tipo de documento y de operacion)
-    private val catalogoRegistroRepository: CatalogoOperacionRepository? = null
+    private val catalogoRegistroRepository: CatalogoOperacionRepository? = null,
+    private val umbralRepository: UmbralNormaRepository? = null
 ) : ApplicationRunner {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -60,12 +64,25 @@ class CatalogoOperacionesInicializador(
         } catch (e: Exception) {
             log.warn("No se pudieron preparar los catalogos del formulario de Operaciones: {}", e.message)
         }
+        if (umbralRepository != null) try {
+            tx.executeWithoutResult { sembrarUmbrales(leerUmbrales()) }
+        } catch (e: Exception) {
+            log.warn("No se pudieron preparar los umbrales de la norma de Operaciones: {}", e.message)
+        }
     }
 
-    /** Agrega las opciones que faltan (por catalogo y codigo); no cambia ni borra las que ya estan. */
+    /**
+     * Agrega las opciones que faltan (por catalogo y codigo); no cambia ni borra las que ya estan, salvo completar el tipo de
+     * bien de un tipo de operacion que se sembro antes de existir esa columna.
+     */
     internal fun sembrarCatalogosRegistro(filas: List<CatalogoOperacionEntity>): Int {
         val repositorio = catalogoRegistroRepository ?: return 0
-        val existentes = repositorio.findAll().map { it.catalogo to it.codigo }.toSet()
+        val guardadas = repositorio.findAll()
+        val porClave = filas.associateBy { it.catalogo to it.codigo }
+        val incompletas = guardadas.filter { it.tipoBien == null && porClave[it.catalogo to it.codigo]?.tipoBien != null }
+        incompletas.forEach { it.tipoBien = porClave.getValue(it.catalogo to it.codigo).tipoBien }
+        if (incompletas.isNotEmpty()) repositorio.saveAll(incompletas)
+        val existentes = guardadas.map { it.catalogo to it.codigo }.toSet()
         val nuevas = filas.filter { (it.catalogo to it.codigo) !in existentes }
         if (nuevas.isNotEmpty()) {
             repositorio.saveAll(nuevas)
@@ -74,19 +91,27 @@ class CatalogoOperacionesInicializador(
         return nuevas.size
     }
 
-    /** Lee "catalogo;codigo;nombre;orden;pide_texto;sector" (con encabezado) desde el classpath. */
-    internal fun leerCatalogosRegistro(): List<CatalogoOperacionEntity> =
-        ClassPathResource(RUTA_CATALOGOS).inputStream.bufferedReader(Charsets.UTF_8).useLines { lineas ->
-            lineas.drop(1)
-                .filter { it.isNotBlank() }
-                .map { linea ->
-                    val c = linea.split(";").map { it.trim() }
-                    CatalogoOperacionEntity(
-                        catalogo = c[0], codigo = c[1], nombre = c[2], orden = c[3].toInt(),
-                        pideTexto = c[4].toBoolean(), sector = c.getOrNull(5)?.takeIf { it.isNotEmpty() }
-                    )
-                }
-                .toList()
+    /** Lee "catalogo;codigo;nombre;orden;pide_texto;sector;tipo_bien" (con encabezado) desde el classpath. */
+    internal fun leerCatalogosRegistro(): List<CatalogoOperacionEntity> = leerCatalogos(RUTA_CATALOGOS)
+
+    /** Umbrales de la norma por grupo de sector y tipo de bien (operaciones/umbrales-norma.csv). */
+    internal fun sembrarUmbrales(filas: List<UmbralNormaEntity>): Int {
+        val repositorio = umbralRepository ?: return 0
+        val existentes = repositorio.findAll().map { it.grupo to it.tipoBien }.toSet()
+        val nuevas = filas.filter { (it.grupo to it.tipoBien) !in existentes }
+        if (nuevas.isNotEmpty()) {
+            repositorio.saveAll(nuevas)
+            log.info("Operaciones: umbrales de la norma agregados={}", nuevas.size)
+        }
+        return nuevas.size
+    }
+
+    internal fun leerUmbrales(): List<UmbralNormaEntity> =
+        ClassPathResource(RUTA_UMBRALES).inputStream.bufferedReader(Charsets.UTF_8).useLines { lineas ->
+            lineas.drop(1).filter { it.isNotBlank() }.map { linea ->
+                val c = linea.split(";").map { it.trim() }
+                UmbralNormaEntity(grupo = c[0], tipoBien = c[1], nombre = c[2], umbralUsd = BigDecimal(c[3]), orden = c[4].toInt())
+            }.toList()
         }
 
     internal fun sembrarMonedas(): Int {
@@ -145,6 +170,21 @@ class CatalogoOperacionesInicializador(
     companion object {
         const val RUTA_PROVINCIAS = "operaciones/provincias.csv"
         const val RUTA_CATALOGOS = "operaciones/catalogos-registro.csv"
+        const val RUTA_UMBRALES = "operaciones/umbrales-norma.csv"
+
+        /** Lee el archivo de catalogos. El nombre puede traer ";" (va entre los dos primeros y los cuatro ultimos campos). */
+        fun leerCatalogos(ruta: String): List<CatalogoOperacionEntity> =
+            ClassPathResource(ruta).inputStream.bufferedReader(Charsets.UTF_8).useLines { lineas ->
+                lineas.drop(1).filter { it.isNotBlank() }.map { linea ->
+                    val c = linea.split(";").map { it.trim() }
+                    val fin = c.takeLast(4)
+                    CatalogoOperacionEntity(
+                        catalogo = c[0], codigo = c[1], nombre = c.subList(2, c.size - 4).joinToString(";"),
+                        orden = fin[0].toInt(), pideTexto = fin[1].toBoolean(),
+                        sector = fin[2].takeIf { it.isNotEmpty() }, tipoBien = fin[3].takeIf { it.isNotEmpty() }
+                    )
+                }.toList()
+            }
 
         internal val MONEDAS = listOf(
             MonedaBase("PEN", "Soles", "S/"),

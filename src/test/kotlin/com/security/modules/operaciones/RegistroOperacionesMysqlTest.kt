@@ -151,7 +151,7 @@ class RegistroOperacionesMysqlTest {
             WHERE table_schema = DATABASE() AND table_name = 'registro_operaciones_v2' AND non_unique = 0
             GROUP BY index_name
             """, String::class.java
-        ).map { it.lowercase() }
+        ).map { it.orEmpty().lowercase() }
         assertTrue("empresa,numero_registro" in columnas, "Indices unicos: $columnas")
         assertFalse("numero_registro" in columnas, "Indices unicos: $columnas")
     }

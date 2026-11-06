@@ -217,9 +217,12 @@ class InicioIntegracionTest {
             .andExpect(jsonPath("$.denuncias.plazosATiempoPct").value(82.0))
             .andExpect(jsonPath("$.denuncias.tiempoPromedioCierreDias").value(9))
             .andExpect(jsonPath("$.denuncias.porSituacion[0].situacion").value("Conflicto de intereses"))
-            .andExpect(jsonPath("$.denuncias.porSituacion[0].cantidad").value(10))
-            .andExpect(jsonPath("$.denuncias.cierres").value(nullValue()))
-            .andExpect(jsonPath("$.denuncias.derivadasAlOficial").value(nullValue()))
+            .andExpect(jsonPath("$.denuncias.porSituacion[0].cantidad").value(8))
+            .andExpect(jsonPath("$.denuncias.porSituacion.length()").value(6))
+            .andExpect(jsonPath("$.denuncias.cierres.fundadaPct").value(40.0))
+            .andExpect(jsonPath("$.denuncias.cierres.infundadaPct").value(33.0))
+            .andExpect(jsonPath("$.denuncias.cierres.archivadaPct").value(27.0))
+            .andExpect(jsonPath("$.denuncias.derivadasAlOficial").value(2))
 
         // Otra empresa no ve nada de esto.
         val (_, otra) = cuenta(empresa(), "ADMINISTRADOR")
@@ -245,6 +248,8 @@ class InicioIntegracionTest {
             .andExpect(jsonPath("$.oficial.estado").value("SIN_OFICIAL"))
             .andExpect(jsonPath("$.denuncias.recibidas").value(1))
             .andExpect(jsonPath("$.denuncias.vencidas").value(0))
+            .andExpect(jsonPath("$.denuncias.derivadasAlOficial").value(0))
+            .andExpect(jsonPath("$.denuncias.cierres").value(nullValue()))
         assertTrue(denuncias.findAll().any { it.codigoSeguimiento?.startsWith("DEN-") == true && it.creadoPorUsuario?.id == admin.id })
     }
 

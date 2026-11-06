@@ -1,6 +1,7 @@
 package com.security.modules.inicio
 
 import com.security.modules.denuncias.domain.enums.CausaDenuncia
+import com.security.modules.denuncias.domain.enums.ResultadoCierreDenuncia
 import com.security.modules.listas.infrastructure.ALCANCE_CONSULTAS
 import jakarta.persistence.EntityManager
 import jakarta.persistence.Query
@@ -196,6 +197,30 @@ class InicioConsultas(private val em: EntityManager) {
             val r = it as Array<*>
             (r[0] as LocalDateTime) to (r[1] as LocalDateTime)
         }
+
+    /** Cerradas en el periodo con resultado, por resultado (las que no tienen resultado no entran). */
+    @Transactional(readOnly = true)
+    fun cierresPorResultado(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): Map<ResultadoCierreDenuncia, Long> =
+        alcanceDenuncias(
+            em.createQuery(
+                """
+                SELECT d.resultadoCierre, COUNT(d) $baseDenuncias
+                AND d.estado = com.security.modules.denuncias.domain.enums.EstadoDenuncia.CERRADO
+                AND d.resultadoCierre IS NOT NULL AND d.fechaCierre >= :desde AND d.fechaCierre < :hasta
+                GROUP BY d.resultadoCierre
+                """
+            ), a
+        ).setParameter("desde", desde).setParameter("hasta", hasta).resultList.associate {
+            val r = it as Array<*>
+            (r[0] as ResultadoCierreDenuncia) to n(r[1])
+        }
+
+    /** Derivadas al oficial en el periodo (solo la cantidad: el detalle es reservado). */
+    @Transactional(readOnly = true)
+    fun derivadas(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): Long =
+        (alcanceDenuncias(
+            em.createQuery("SELECT COUNT(d) $baseDenuncias AND d.derivadaAlOficial = true AND d.fechaDerivacion >= :desde AND d.fechaDerivacion < :hasta"), a
+        ).setParameter("desde", desde).setParameter("hasta", hasta).singleResult as Number).toLong()
 
     // ------------------------------------------------------------------ piezas
 

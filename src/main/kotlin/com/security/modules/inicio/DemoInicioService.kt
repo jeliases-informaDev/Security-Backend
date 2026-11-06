@@ -1,6 +1,8 @@
 package com.security.modules.inicio
 
+import com.security.modules.denuncias.application.service.PlazoDenunciasService
 import com.security.modules.denuncias.domain.enums.CausaDenuncia
+import com.security.modules.denuncias.domain.enums.ResultadoCierreDenuncia
 import com.security.modules.denuncias.domain.enums.EstadoDenuncia
 import com.security.modules.denuncias.domain.enums.RelacionEmpresa
 import com.security.modules.denuncias.infrastructure.persistence.entity.DenunciaEntity
@@ -64,6 +66,7 @@ class DemoInicioService(
     private val denuncias: DenunciaRepository,
     private val designaciones: OcDesignacionRepository,
     private val reloj: RelojInicio,
+    private val plazoDenuncias: PlazoDenunciasService,
     private val em: EntityManager
 ) {
     private val json = jacksonObjectMapper()
@@ -73,7 +76,6 @@ class DemoInicioService(
         const val PREFIJO_RO = "RO-DEMO-"
         const val PREFIJO_DENUNCIA = "DEMO-"
         const val MARCA_OFICIAL = "__demo_inicio__"
-        const val PLAZO_DENUNCIAS = 30L
 
         private val NOMBRES = listOf("Lucía", "Mateo", "Valeria", "Diego", "Camila", "Joaquín", "Renata", "Bruno", "Ximena", "Thiago", "Antonella", "Gael")
         private val APELLIDOS = listOf("Ficticio", "Ejemplar", "Prueba", "Muestra", "Modelo", "Ensayo", "Simulado", "Demostrado", "Patrón", "Boceto", "Borrador", "Maqueta")
@@ -421,7 +423,12 @@ class DemoInicioService(
         val hoy = reloj.hoy()
         val inicioMes = hoy.withDayOfMonth(1).atStartOfDay()
         val prefijo = prefijoDenuncia(empresa)
-        val causas = List(10) { CausaDenuncia.CONFLICTO } + List(8) { CausaDenuncia.SOBORNO } + List(6) { CausaDenuncia.ACOSO }
+        // Situaciones del mes: 8/5/4/3/2/2 (como el diseno).
+        val causas = List(8) { CausaDenuncia.CONFLICTO } + List(5) { CausaDenuncia.FRAUDE } + List(4) { CausaDenuncia.SOBORNO } +
+            List(3) { CausaDenuncia.ACOSO } + List(2) { CausaDenuncia.OPERACION_SOSPECHOSA } + List(2) { CausaDenuncia.OTRAS }
+        // Resultado de 15 de las cerradas del mes: 6 fundadas, 5 infundadas, 4 archivadas (40/33/27 %); el resto, sin dato.
+        val resultados = List(6) { ResultadoCierreDenuncia.FUNDADA } + List(5) { ResultadoCierreDenuncia.INFUNDADA } +
+            List(4) { ResultadoCierreDenuncia.ARCHIVADA }
         val relaciones = RelacionEmpresa.entries
         var n = 0
         val lista = mutableListOf<DenunciaEntity>()
@@ -437,21 +444,31 @@ class DemoInicioService(
             )
         }
 
-        // Mes en curso: 24 recibidas = 4 abiertas (2 sin abrir) + 20 cerradas el mismo dia.
+        // Mes en curso: 24 recibidas = 4 abiertas (2 sin abrir) + 20 cerradas el mismo dia; 2 derivadas al oficial.
         causas.forEachIndexed { i, causa ->
             val creada = enMesActual(i, causas.size, ahora.minusMinutes(5))
-            lista += when (i) {
+            val d = when (i) {
                 0, 1 -> nueva(causa, creada, EstadoDenuncia.RECIBIDO, null)
                 2, 3 -> nueva(causa, creada, EstadoDenuncia.EN_PROCESO, null)
-                else -> nueva(causa, creada, EstadoDenuncia.CERRADO, limitar(creada.plusHours(2), creada))
+                else -> nueva(causa, creada, EstadoDenuncia.CERRADO, limitar(creada.plusHours(2), creada)).also {
+                    it.resultadoCierre = resultados.getOrNull(i - 4)
+                    if (it.resultadoCierre == ResultadoCierreDenuncia.ARCHIVADA) it.motivoCierre = "Demostración: no hay elementos para continuar."
+                }
             }
+            if (i == 2 || i == 5) {
+                d.derivadaAlOficial = true
+                d.fechaDerivacion = limitar(creada.plusMinutes(30), creada)
+                d.derivadaPorUsuario = admin
+                d.motivoDerivacion = "Demostración: posible relación con una operación inusual."
+            }
+            lista += d
         }
         // Cerradas este mes pero recibidas antes: 3 a tiempo (5 a 7 dias) y 5 fuera de plazo; promedio de las 28: 9 dias.
         val cierre = limitar(inicioMes.plusHours(10), inicioMes)
         listOf(5L, 6L, 7L).forEach { lista += nueva(CausaDenuncia.CONFLICTO, cierre.minusDays(it), EstadoDenuncia.CERRADO, cierre) }
         listOf(46L, 47L, 47L, 47L, 47L).forEach { lista += nueva(CausaDenuncia.SOBORNO, cierre.minusDays(it), EstadoDenuncia.CERRADO, cierre) }
         // Una abierta con el plazo vencido.
-        lista += nueva(CausaDenuncia.CONFLICTO, ahora.minusDays(PLAZO_DENUNCIAS + 5), EstadoDenuncia.EN_PROCESO, null)
+        lista += nueva(CausaDenuncia.CONFLICTO, ahora.minusDays(plazoDenuncias.dias + 5), EstadoDenuncia.EN_PROCESO, null)
         denuncias.saveAll(lista)
         return lista.size
     }

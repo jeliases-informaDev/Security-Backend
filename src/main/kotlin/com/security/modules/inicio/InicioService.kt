@@ -1,6 +1,7 @@
 package com.security.modules.inicio
 
-import com.security.modules.denuncias.domain.enums.CausaDenuncia
+import com.security.modules.denuncias.application.service.PlazoDenunciasService
+import com.security.modules.denuncias.domain.enums.ResultadoCierreDenuncia
 import com.security.modules.listas.application.service.ReglasListasService
 import com.security.modules.listas.domain.reglas.CalculoListas
 import com.security.modules.listas.domain.reglas.Clasificacion
@@ -19,7 +20,6 @@ import com.security.shared.security.ROL_ADMINISTRADOR
 import com.security.shared.security.ROL_ADMINISTRADOR_EMPRESA
 import com.security.shared.security.limpiarEmpresa
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import java.math.RoundingMode
@@ -46,7 +46,7 @@ class InicioService(
     private val reglasOficial: ReglasOficialService,
     private val demo: DemoInicioService,
     private val reloj: RelojInicio,
-    @Value("\${app.inicio.denuncias.plazo-dias:30}") private val plazoDenunciasDias: Long
+    private val plazoDenuncias: PlazoDenunciasService
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -60,11 +60,6 @@ class InicioService(
         fun etiqueta(p: YearMonth): String =
             p.month.getDisplayName(TextStyle.FULL, ES).replaceFirstChar { it.titlecase(ES) } + " " + p.year
 
-        fun nombreCausa(c: CausaDenuncia): String = when (c) {
-            CausaDenuncia.CONFLICTO -> "Conflicto de intereses"
-            CausaDenuncia.SOBORNO -> "Soborno o corrupción"
-            CausaDenuncia.ACOSO -> "Acoso u hostigamiento"
-        }
     }
 
     // Sin transaccion propia a proposito: cada consulta lleva la suya, asi un bloque que falla no arrastra a los demas.
@@ -263,7 +258,11 @@ class InicioService(
         }
         val desde = periodo.atDay(1).atStartOfDay()
         val hasta = periodo.plusMonths(1).atDay(1).atStartOfDay()
-        val abiertas = consultas.abiertas(a, reloj.ahora().minusDays(plazoDenunciasDias))
+        val plazoDenunciasDias = plazoDenuncias.dias
+        // Vencida = no cerrada y hoy > creacion + plazo (misma regla que el modulo de denuncias).
+        val abiertas = consultas.abiertas(a, reloj.hoy().minusDays(plazoDenunciasDias).atStartOfDay())
+        val porResultado = consultas.cierresPorResultado(a, desde, hasta)
+        val conResultado = porResultado.values.sum()
         val cerradas = consultas.cerradas(a, desde, hasta)
         val duraciones = cerradas.map { (creada, cerrada) -> maxOf(0L, ChronoUnit.DAYS.between(creada.toLocalDate(), cerrada.toLocalDate())) }
         return DenunciasInicio(
@@ -274,10 +273,14 @@ class InicioService(
             sinAbrir = abiertas.sinAbrir,
             plazosATiempoPct = porcentaje(duraciones.count { it <= plazoDenunciasDias }.toLong(), duraciones.size.toLong()),
             porSituacion = consultas.porCausa(a, desde, hasta).sortedByDescending { it.second }
-                .map { SituacionDenuncias(nombreCausa(it.first), it.second) },
-            cierres = null,
+                .take(6).map { SituacionDenuncias(it.first.etiqueta, it.second) },
+            cierres = if (conResultado == 0L) null else CierresDenuncias(
+                fundadaPct = porcentaje(porResultado[ResultadoCierreDenuncia.FUNDADA] ?: 0L, conResultado) ?: 0.0,
+                infundadaPct = porcentaje(porResultado[ResultadoCierreDenuncia.INFUNDADA] ?: 0L, conResultado) ?: 0.0,
+                archivadaPct = porcentaje(porResultado[ResultadoCierreDenuncia.ARCHIVADA] ?: 0L, conResultado) ?: 0.0
+            ),
             tiempoPromedioCierreDias = if (duraciones.isEmpty()) null else Math.round(duraciones.average()).toInt(),
-            derivadasAlOficial = null
+            derivadasAlOficial = consultas.derivadas(a, desde, hasta)
         )
     }
 }

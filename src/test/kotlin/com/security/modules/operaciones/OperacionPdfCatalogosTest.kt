@@ -66,7 +66,7 @@ class OperacionPdfCatalogosTest {
         val bytes = PdfBoxGeneradorPdfAdapter().generar(exportacion)
         Loader.loadPDF(bytes).use { pdf ->
             val texto = PDFTextStripper().getText(pdf)
-            listOf("Peru", "Administradora de empresas", "Provincia de prueba", "Sol peruano").forEach {
+            listOf("Peru", "Administradora de empresas", "Sol peruano", "00123456", "Luis Torres").forEach {
                 assertTrue(texto.contains(it), "Falta $it en el PDF")
             }
             val output = Path.of("output/pdf/operacion-catalogos-ejemplo.pdf")

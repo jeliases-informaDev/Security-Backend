@@ -1,61 +1,80 @@
 package com.tuempresa.operaciones.dto
 
-import jakarta.validation.Valid
-import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotEmpty
-import jakarta.validation.constraints.NotNull
-import jakarta.validation.constraints.Size
 import java.math.BigDecimal
 import java.time.LocalDate
 
+/**
+ * Alta de un registro (formulario nuevo, RO 2/RO 3). Los datos minimos los valida ValidadorOperacion y responde
+ * OPERACIONES_DATOS_INVALIDOS con el mensaje de cada campo; por eso aqui todo es opcional.
+ * `numeroRegistro` ya no se usa: el numero RO-AAAA-NNNNNN lo pone el servidor (si llega, se ignora).
+ */
 data class RegistrarOperacionRequest(
-    @field:Valid @field:NotNull val registro: RegistroDto,
-    @field:Valid @field:NotNull val personaFisica: PersonaDto,
-    @field:Valid val personaRepresentada: PersonaDto?,
-    @field:Valid @field:NotNull val operacion: OperacionDto,
-    @field:Valid @field:NotEmpty val beneficiarios: List<BeneficiarioDto>,
-    @field:NotBlank @field:Size(max = 50) val numeroRegistro: String
+    val registro: RegistroDto = RegistroDto(),
+    val personaFisica: PersonaDto = PersonaDto(),
+    val personaRepresentada: PersonaDto? = null,
+    val operacion: OperacionDto = OperacionDto(),
+    val beneficiarios: List<BeneficiarioDto> = emptyList(),
+    val numeroRegistro: String? = null
 )
 
+/**
+ * usuarioId, usuario y empresa los pone el servidor (solo el administrador universal puede indicar otra cuenta).
+ * fechaRegistro se ignora: la fecha y la hora de registro las pone el servidor.
+ */
 data class RegistroDto(
-    @field:NotBlank val usuarioId: String,
-    @field:NotBlank val usuario: String,
-    @field:NotBlank val empresa: String,
-    @field:NotBlank val oficina: String,
-    @field:NotNull val fechaRegistro: LocalDate
+    val usuarioId: String? = null,
+    val usuario: String? = null,
+    val empresa: String? = null,
+    val oficina: String? = null,
+    val fechaRegistro: LocalDate? = null
 )
 
+/** Persona que realiza (natural) o representada (natural o juridica, segun tipoPersona). */
 data class PersonaDto(
-    @field:NotBlank val tipoDocumento: String,
-    @field:NotBlank val numeroDocumento: String,
-    @field:NotBlank val nombres: String,
-    @field:NotBlank val apellidos: String,
-    @field:NotNull val fechaNacimiento: LocalDate,
-    val nacionalidad: String?,
-    val telefono: String?,
-    val ocupacion: String?,
-    val domicilio: String?,
-    val codigoPostal: String?,
-    val departamento: String?,
-    val provincia: String?,
-    val distrito: String?
+    val tipoDocumento: String? = null,
+    val numeroDocumento: String? = null,
+    val nombres: String? = null,
+    val apellidos: String? = null,
+    val fechaNacimiento: LocalDate? = null,
+    val nacionalidad: String? = null,
+    val telefono: String? = null,
+    val ocupacion: String? = null,
+    val domicilio: String? = null,
+    val codigoPostal: String? = null,
+    val departamento: String? = null,
+    val provincia: String? = null,
+    val distrito: String? = null,
+    val motivoSinDocumento: String? = null,
+    val estadoCivil: String? = null,
+    val tipoPersona: String? = null,
+    val razonSocial: String? = null,
+    val representanteLegal: String? = null,
+    val representanteTipoDocumento: String? = null,
+    val representanteNumeroDocumento: String? = null,
+    val accionistasMayores25: String? = null,
+    val domicilioFiscal: String? = null
 )
 
 data class OperacionDto(
-    @field:NotNull val fechaOperacion: LocalDate,
-    val lugar: String?,
-    @field:NotBlank val modalidadPago: String,
-    @field:NotBlank val moneda: String,          // "PEN — Soles"
-    @field:NotNull val monto: BigDecimal,        // Jackson convierte "234" -> BigDecimal
-    @field:NotBlank val tipoOperacion: String,
-    val cuenta1: String?,
-    val cuenta2: String?,
-    val cuenta3: String?
+    val fechaOperacion: LocalDate? = null,
+    val lugar: String? = null,
+    val modalidadPago: String? = null,
+    val moneda: String? = null,
+    val monto: BigDecimal? = null,
+    val tipoOperacion: String? = null,
+    val cuenta1: String? = null,
+    val cuenta2: String? = null,
+    val cuenta3: String? = null,
+    val modalidadPagoTexto: String? = null,
+    val origenFondos: String? = null,
+    val origenFondosTexto: String? = null,
+    val numeroComprobante: String? = null,
+    val descripcion: String? = null
 )
 
 data class BeneficiarioDto(
-    @field:NotBlank val nombre: String,
-    @field:NotBlank val tipoDocumento: String,
-    @field:NotBlank val numeroDocumento: String,
-    @field:NotNull val fechaNacimiento: LocalDate
+    val nombre: String? = null,
+    val tipoDocumento: String? = null,
+    val numeroDocumento: String? = null,
+    val fechaNacimiento: LocalDate? = null
 )

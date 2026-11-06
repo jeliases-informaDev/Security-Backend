@@ -89,6 +89,8 @@ class SecurityConfig(
         config.addAllowedMethod("*")
         // La web lee el total de resultados de las busquedas paginadas en estas cabeceras
         CabecerasPaginacion.TODAS.forEach { config.addExposedHeader(it) }
+        // y el PDF del Registro de Operaciones, su codigo de verificacion y su huella
+        listOf("X-Codigo-Verificacion", "X-Huella-Sha256", "X-Paginas").forEach { config.addExposedHeader(it) }
 
         source.registerCorsConfiguration("/**", config)
 

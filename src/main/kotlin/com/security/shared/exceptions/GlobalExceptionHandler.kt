@@ -5,6 +5,7 @@ import com.security.modules.licencias.LicenciaBloqueadaException
 import com.security.modules.licencias.LicenciaBolsaAgotadaException
 import com.security.modules.licencias.LicenciaReglas
 import com.security.modules.licencias.LicenciaSinCupoException
+import com.security.modules.operaciones.application.service.OperacionesException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -176,7 +177,25 @@ class GlobalExceptionHandler {
         return buildResponse(
             status = HttpStatus.NOT_FOUND,
             message = ex.message ?: "Recurso no encontrado",
-            request = request
+            request = request,
+            code = ex.code
+        )
+    }
+
+    // Registro de Operaciones: error de negocio con su codigo y, en los datos de un formulario, el mensaje de cada campo.
+    // Va antes que ResponseStatusException (de la que hereda) porque Spring elige el manejador mas especifico.
+    @ExceptionHandler(OperacionesException::class)
+    fun handleOperaciones(
+        ex: OperacionesException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiErrorResponse> {
+
+        return buildResponse(
+            status = HttpStatus.valueOf(ex.statusCode.value()),
+            message = ex.reason ?: "Solicitud inválida",
+            request = request,
+            code = ex.code,
+            campos = ex.campos?.takeIf { it.isNotEmpty() }
         )
     }
 
@@ -282,7 +301,8 @@ class GlobalExceptionHandler {
         enlace: String? = null,
         estado: String? = null,
         activos: Long? = null,
-        usuariosMax: Long? = null
+        usuariosMax: Long? = null,
+        campos: Map<String, String>? = null
     ): ResponseEntity<ApiErrorResponse> {
 
         val response = ApiErrorResponse(
@@ -294,7 +314,8 @@ class GlobalExceptionHandler {
             enlace = enlace,
             estado = estado,
             activos = activos,
-            usuariosMax = usuariosMax
+            usuariosMax = usuariosMax,
+            campos = campos
         )
 
         // JSON fijo: así el error también llega a quien pidió un PDF (Accept: application/pdf) en vez de un 406.

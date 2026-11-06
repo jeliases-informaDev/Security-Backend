@@ -21,6 +21,7 @@ class BeneficiarioEntity(
     @Column(name = "numero_documento")
     val numeroDocumento: String,
 
+    // Opcional desde el diseño nuevo (EsquemaOperacionesInicializador quita el NOT NULL de las bases que lo tenian).
     @Column(name = "fecha_nacimiento")
-    val fechaNacimiento: LocalDate
+    val fechaNacimiento: LocalDate? = null
 )

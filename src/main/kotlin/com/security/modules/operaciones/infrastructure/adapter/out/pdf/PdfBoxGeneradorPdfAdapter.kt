@@ -1,376 +1,288 @@
 package com.security.modules.operaciones.infrastructure.adapter.out.pdf
 
+import com.security.modules.operaciones.application.service.CatalogosOperacion
+import com.security.modules.operaciones.application.service.FotoOperacion
 import com.security.modules.operaciones.domain.model.*
 import com.security.modules.operaciones.domain.port.out.GeneradorPdfPort
-import org.apache.pdfbox.pdmodel.*
+import com.security.modules.operaciones.domain.port.out.PiePdf
+import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.pdmodel.PDPage
+import org.apache.pdfbox.pdmodel.PDPageContentStream
 import org.apache.pdfbox.pdmodel.common.PDRectangle
 import org.apache.pdfbox.pdmodel.font.PDType1Font
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts
-import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject
 import org.apache.pdfbox.util.Matrix
-import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Component
 import java.awt.Color
 import java.io.ByteArrayOutputStream
-import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+/**
+ * PDF del registro con el diseño nuevo (RO 9): una sola pagina con la persona que realiza, la representada, la operacion
+ * y los beneficiarios, y el pie con quien lo genero, el codigo de verificacion y la huella SHA-256 del contenido.
+ * Primero se mide y, si no cabe, todo se reduce en la misma proporcion (nunca se cortan filas ni valores).
+ */
 @Component
 class PdfBoxGeneradorPdfAdapter : GeneradorPdfPort {
-    override fun generar(operacion: OperacionExportacion): ByteArray {
+
+    override fun generar(operacion: OperacionExportacion, pie: PiePdf?): ByteArray {
         PDDocument().use { document ->
             val page = PDPage(PDRectangle.A4)
             document.addPage(page)
+            val margen = 40f
+            val ancho = page.mediaBox.width - 2 * margen
+            val disponible = page.mediaBox.height - 2 * margen
+            val alto = Hoja(null, ancho).dibujar(operacion, pie)
+            val escala = minOf(1f, disponible / alto)
             PDPageContentStream(document, page).use { stream ->
-                val form = FormularioPdf(stream)
-                val r = operacion.registro
-                val o = operacion.operacion
-
-                val resumen = listOf(
-                    Campo("N.º de registro", operacion.codigoOperacion),
-                    Campo("Fecha de operación", fecha(o.fechaOperacion)),
-                    Campo("Monto", "${o.moneda} ${o.monto.toPlainString()}"),
-                    Campo("Oficina", r.oficina)
-                )
-
-                val sections = listOf(
-                    Seccion("I", "Información del registro", listOf(
-                        listOf(Campo("Usuario que registra", r.usuario), Campo("Empresa", r.empresa)),
-                        listOf(Campo("N.º de registro", operacion.codigoOperacion), Campo("Oficina", r.oficina),
-                            Campo("Fecha del registro", fecha(r.fechaRegistro)))
-                    )),
-                    Seccion("II", "Persona que realiza físicamente la operación", persona(operacion.personaFisica)),
-                    Seccion("III", "Persona en cuyo nombre se realiza la operación",
-                        operacion.personaRepresentada?.let(::persona)
-                            ?: listOf(listOf(Campo("Persona representada", "No registrada")))),
-                    Seccion("IV", "Descripción de la operación", listOf(
-                        listOf(Campo("Fecha de operación", fecha(o.fechaOperacion)), Campo("Lugar de realización", o.lugar),
-                            Campo("Modalidad de pago", o.modalidadPago), Campo("Tipo de moneda", o.moneda)),
-                        listOf(Campo("Monto de la operación", o.monto.toPlainString()), Campo("Tipo de operación", o.tipoOperacion),
-                            Campo("N.º de cuenta 1", o.cuenta1), Campo("N.º de cuenta 2", o.cuenta2)),
-                        listOf(Campo("N.º de cuenta 3", o.cuenta3))
-                    ))
-                )
-                val beneficiaries = operacion.beneficiarios.mapIndexed { index, b ->
-                    listOf((index + 1).toString(), b.nombre, b.tipoDocumento, b.numeroDocumento, fecha(b.fechaNacimiento))
-                }
-
-                val fullHeight = form.alturaResumen(resumen) + form.separacion +
-                        sections.sumOf { (form.altura(it) + form.separacion).toDouble() }.toFloat() +
-                        form.alturaBeneficiarios(beneficiaries)
-                val available = page.mediaBox.height - 150f
-                val scale = minOf(1f, available / fullHeight)
-                val width = 539f
-                val left = (page.mediaBox.width - width * scale) / 2f
-
-                // Cabecera fija: el logo conserva su proporción original.
                 stream.saveGraphicsState()
-                stream.transform(Matrix.getTranslateInstance(28f, page.mediaBox.height - 24f))
-                val logoBytes = ClassPathResource("static/images/Informa_Peru_Logo_Completo_Color_PNG_transparente.png")
-                    .inputStream.use { it.readBytes() }
-                val logo = PDImageXObject.createFromByteArray(document, logoBytes, "Informa Peru")
-                val logoScale = minOf(125f / logo.width, 40f / logo.height)
-                stream.drawImage(logo, 0f, -40f, logo.width * logoScale, logo.height * logoScale)
-                form.cabeceraPagina("${operacion.id}", fecha(r.fechaRegistro))
-                stream.restoreGraphicsState()
-
-                // Contenido (se reduce solo si no cabe en una hoja).
-                stream.saveGraphicsState()
-                stream.transform(Matrix(scale, 0f, 0f, scale, left, page.mediaBox.height - 100f))
-                var top = form.resumen(resumen, 0f) + form.separacion
-                sections.forEach { top = form.seccion(it, top) }
-                form.beneficiarios(beneficiaries, top)
-                stream.restoreGraphicsState()
-
-                // Pie de página.
-                stream.saveGraphicsState()
-                stream.transform(Matrix.getTranslateInstance(28f, 27f))
-                form.pie(LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                stream.transform(Matrix(escala, 0f, 0f, escala, margen + (ancho - ancho * escala) / 2f, page.mediaBox.height - margen))
+                Hoja(stream, ancho).dibujar(operacion, pie)
                 stream.restoreGraphicsState()
             }
-            return ByteArrayOutputStream().use { output ->
-                document.save(output)
-                output.toByteArray()
+            return ByteArrayOutputStream().use { salida ->
+                document.save(salida)
+                salida.toByteArray()
             }
         }
     }
-
-    private fun persona(p: PersonaExportacion) = listOf(
-        listOf(Campo("Documento de identidad", p.tipoDocumento), Campo("N.º de documento", p.numeroDocumento),
-            Campo("Nombres", p.nombres), Campo("Apellidos", p.apellidos)),
-        listOf(Campo("Fecha de nacimiento", fecha(p.fechaNacimiento)), Campo("Nacionalidad", p.nacionalidad),
-            Campo("Teléfono", p.telefono), Campo("Profesión u ocupación", p.ocupacion)),
-        listOf(Campo("Domicilio", p.domicilio), Campo("Código postal", p.codigoPostal),
-            Campo("Departamento", p.departamento), Campo("Provincia", p.provincia)),
-        listOf(Campo("Distrito", p.distrito))
-    )
 }
 
-private fun fecha(value: LocalDate?) = value?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: "-"
-private data class Campo(val etiqueta: String, val valor: String?)
-private data class Seccion(val numero: String, val titulo: String, val filas: List<List<Campo>>)
+private data class Dato(val etiqueta: String, val valor: String?)
 
-/** Mide antes de dibujar: el ajuste a una hoja nunca elimina filas ni recorta valores. */
-private class FormularioPdf(private val stream: PDPageContentStream) {
+/** Dibuja (o solo mide, si stream es null) con el origen en la esquina superior izquierda y `top` hacia abajo. */
+private class Hoja(private val stream: PDPageContentStream?, private val ancho: Float) {
     private val regular = PDType1Font(Standard14Fonts.FontName.HELVETICA)
-    private val bold = PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD)
+    private val negrita = PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD)
+    private val mono = PDType1Font(Standard14Fonts.FontName.COURIER)
 
-    // Paleta corporativa del sistema.
-    private val blue = Color(27, 69, 137)    // #1B4589
-    private val steel = Color(84, 122, 167)  // #547AA7
-    private val pale = Color(232, 236, 243)  // #E8ECF3
-    private val line = Color(198, 208, 226)  // #C6D0E2
-    private val soft = Color(247, 249, 252)  // #F7F9FC
-    private val ink = Color(35, 31, 32)      // #231F20
-    private val red = Color(220, 38, 38)
+    private val tinta = Color(23, 23, 28)
+    private val gris = Color(110, 112, 122)
+    private val lila = Color(108, 76, 230)
+    private val linea = Color(225, 226, 232)
 
-    private val width = 539f
-    private val tableWidths = listOf(28f, 175f, 108f, 100f, 100f) // suma 511 = width - 28
-    val separacion = 10f
+    private val pad = 24f
+    private val interior get() = ancho - 2 * pad
+    private val fechaHora = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 
-    // ---------- Texto ----------
+    fun dibujar(o: OperacionExportacion, pie: PiePdf?): Float {
+        var top = pad
+        // Cabecera
+        if (stream != null) {
+            redondeado(pad, top, 18f, 18f, 4f, lila)
+            stream.setStrokingColor(Color.WHITE)
+            stream.setLineWidth(1.6f)
+            stream.moveTo(pad + 5f, -(top + 9.5f))
+            stream.lineTo(pad + 8f, -(top + 12.5f))
+            stream.lineTo(pad + 13.5f, -(top + 6f))
+            stream.stroke()
+        }
+        texto("PLAFT · Registro de operaciones", pad + 26f, top + 1f, 11f, negrita, tinta)
+        val empresa = o.registro.empresa.trim().uppercase()
+        texto("$empresa · DOCUMENTO CONFIDENCIAL", pad + 26f, top + 14f, 6.5f, mono, gris, ancho - 2 * pad - 26f - 110f)
+        textoDerecha(o.codigoOperacion, ancho - pad, top + 4f, 9f, mono, tinta)
+        top += 32f
+        raya(top)
+        top += 14f
 
-    private fun limpio(value: String): String = buildString {
-        value.replace("\r", " ").replace("\n", " ").replace("\t", " ").codePoints().forEach { cp ->
+        // Persona que realiza
+        val pf = o.personaFisica
+        top = seccion("Persona que realiza", top)
+        top = rejilla(listOf(
+            Dato("Nombre", nombre(pf)),
+            Dato("Documento", documento(pf)),
+            Dato("Nacionalidad", pf.nacionalidad),
+            Dato("Ocupación", pf.ocupacion),
+            Dato("Teléfono", pf.telefono),
+            Dato("Domicilio", pf.domicilio)
+        ), top)
+
+        // Persona representada
+        o.personaRepresentada?.let { pr ->
+            top = seccion("Persona representada", top)
+            val datos = if (pr.tipoPersona == CatalogosOperacion.JURIDICA) listOf(
+                Dato("Razón social", pr.razonSocial),
+                Dato(etiquetaDocumento(pr), pr.numeroDocumento.ifBlank { pr.motivoSinDocumento }),
+                Dato("Representante", pr.representanteLegal)
+            ) else listOf(
+                Dato("Nombre", nombre(pr)),
+                Dato("Documento", documento(pr))
+            )
+            top = rejilla(datos, top)
+        }
+
+        // Operacion
+        val op = o.operacion
+        top = seccion("Operación", top)
+        val modalidad = listOfNotNull(op.modalidadPagoNombre ?: op.modalidadPago, op.modalidadPagoTexto).joinToString(" · ")
+        val origen = listOfNotNull(op.origenFondosNombre ?: op.origenFondos, op.origenFondosTexto).joinToString(" · ").ifBlank { null }
+        top = rejilla(listOf(
+            Dato("Fecha", FotoOperacion.fecha(op.fechaOperacion)),
+            Dato("Tipo", op.tipoOperacionNombre ?: op.tipoOperacion),
+            Dato("Modalidad", modalidad),
+            Dato("Moneda y monto", "${op.monedaCodigo ?: op.moneda} ${FotoOperacion.monto(op.monto)}"),
+            Dato("Origen de fondos", origen),
+            Dato("Comprobante", op.numeroComprobante)
+        ), top)
+
+        // Beneficiarios
+        top = seccion("Beneficiarios", top)
+        top = beneficiarios(o.beneficiarios, top)
+
+        // Pie
+        raya(top)
+        top += 10f
+        val generado = pie?.let { "Generado el ${it.generadoEn.format(fechaHora)} por ${it.usuario} · Oficina ${o.registro.oficina}" }
+            ?: "Oficina ${o.registro.oficina}"
+        top = parrafo(generado, pad, top, interior, 6.5f, mono, gris, 9f)
+        if (pie != null) {
+            top = parrafo("Código de verificación ${pie.codigoVerificacion} · SHA-256 ${pie.huella}", pad, top + 2f, interior, 6.5f, mono, gris, 9f)
+        }
+        val alto = top + pad
+        if (stream != null) {
+            stream.setStrokingColor(linea)
+            stream.setLineWidth(0.8f)
+            stream.addRect(0f, -alto, ancho, alto)
+            stream.stroke()
+        }
+        return alto
+    }
+
+    // ---------- Bloques ----------
+
+    private fun seccion(titulo: String, top: Float): Float {
+        texto(titulo.uppercase(), pad, top, 7f, mono, lila)
+        return top + 16f
+    }
+
+    private fun rejilla(datos: List<Dato>, top: Float): Float {
+        val columnas = 3
+        val separacion = 16f
+        val w = (interior - (columnas - 1) * separacion) / columnas
+        var y = top
+        datos.chunked(columnas).forEach { fila ->
+            val alturas = fila.map { lineas(it.valor, w, 9f, regular).size }
+            fila.forEachIndexed { i, dato ->
+                val x = pad + i * (w + separacion)
+                texto(dato.etiqueta, x, y, 7f, regular, gris)
+                lineas(dato.valor, w, 9f, regular).forEachIndexed { j, l -> texto(l, x, y + 10f + j * 11f, 9f, regular, tinta) }
+            }
+            y += 10f + alturas.max() * 11f + 8f
+        }
+        return y + 4f
+    }
+
+    private fun beneficiarios(lista: List<BeneficiarioExportacion>, top: Float): Float {
+        if (lista.isEmpty()) {
+            texto("Sin beneficiarios registrados", pad, top, 9f, regular, gris)
+            return top + 20f
+        }
+        val separacion = 16f
+        val w = (interior - separacion) / 2
+        var y = top
+        lista.withIndex().chunked(2).forEach { fila ->
+            val alturas = fila.map { lineas(it.value.nombre, w, 9f, regular).size }
+            fila.forEachIndexed { i, (indice, b) ->
+                val x = pad + i * (w + separacion)
+                texto("${indice + 1}", x, y, 7f, regular, gris)
+                val ls = lineas(b.nombre, w, 9f, regular)
+                ls.forEachIndexed { j, l -> texto(l, x, y + 10f + j * 11f, 9f, regular, tinta) }
+                val doc = listOf(b.tipoDocumento, b.numeroDocumento).filter { it.isNotBlank() }.joinToString(" ")
+                if (doc.isNotBlank()) texto(doc, x, y + 10f + ls.size * 11f + 1f, 6.5f, mono, gris, w)
+            }
+            y += 10f + alturas.max() * 11f + 14f
+        }
+        return y + 4f
+    }
+
+    private fun nombre(p: PersonaExportacion): String? =
+        listOf(p.apellidos, p.nombres).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(", ").ifBlank { null }
+
+    private fun documento(p: PersonaExportacion): String? =
+        if (p.tipoDocumento.equals(CatalogosOperacion.SIN_DOCUMENTO, ignoreCase = true)) {
+            listOfNotNull("SIN DOCUMENTO", p.motivoSinDocumento).joinToString(" · ")
+        } else listOf(p.tipoDocumento, p.numeroDocumento).filter { it.isNotBlank() }.joinToString(" ").ifBlank { null }
+
+    private fun etiquetaDocumento(p: PersonaExportacion): String =
+        if (p.tipoDocumento.equals(CatalogosOperacion.SIN_DOCUMENTO, ignoreCase = true)) "Sin documento"
+        else p.tipoDocumento.ifBlank { "Documento" }
+
+    // ---------- Texto y formas ----------
+
+    private fun limpio(valor: String, fuente: PDType1Font): String = buildString {
+        valor.replace("\r", " ").replace("\n", " ").replace("\t", " ").codePoints().forEach { cp ->
             val s = String(Character.toChars(cp))
-            append(try { regular.encode(s); s } catch (_: IllegalArgumentException) { "?" })
+            append(try { fuente.encode(s); s } catch (_: IllegalArgumentException) { "?" })
         }
     }
 
-    private fun ancho(value: String, size: Float, strong: Boolean = false): Float =
-        (if (strong) bold else regular).getStringWidth(limpio(value)) / 1000f * size
+    private fun anchoTexto(valor: String, size: Float, fuente: PDType1Font) = fuente.getStringWidth(limpio(valor, fuente)) / 1000f * size
 
-    private fun lineas(value: String?, maxWidth: Float, size: Float, fuente: PDType1Font = regular): List<String> {
-        val text = limpio(value?.takeIf { it.isNotBlank() } ?: "-")
-        val result = mutableListOf<String>()
+    private fun lineas(valor: String?, maximo: Float, size: Float, fuente: PDType1Font): List<String> {
+        val texto = limpio(valor?.takeIf { it.isNotBlank() }?.trim() ?: "—".let { if (runCatching { fuente.encode(it) }.isSuccess) it else "-" }, fuente)
+        val resultado = mutableListOf<String>()
         var actual = ""
-        fun cabe(value: String) = fuente.getStringWidth(value) / 1000f * size <= maxWidth
-        for (word in text.split(Regex("\\s+"))) {
-            val candidate = if (actual.isEmpty()) word else "$actual $word"
-            if (cabe(candidate)) {
-                actual = candidate
-                continue
-            }
-            if (actual.isNotEmpty()) {
-                result.add(actual)
-                actual = ""
-            }
-            // Solo divide palabras cuando una palabra o código supera el ancho completo.
-            for (char in word) {
-                if (!cabe(actual + char) && actual.isNotEmpty()) {
-                    result.add(actual)
-                    actual = ""
-                }
-                actual += char
+        fun cabe(v: String) = fuente.getStringWidth(v) / 1000f * size <= maximo
+        for (palabra in texto.split(Regex("\\s+"))) {
+            val candidato = if (actual.isEmpty()) palabra else "$actual $palabra"
+            if (cabe(candidato)) { actual = candidato; continue }
+            if (actual.isNotEmpty()) { resultado.add(actual); actual = "" }
+            for (c in palabra) {
+                if (!cabe(actual + c) && actual.isNotEmpty()) { resultado.add(actual); actual = "" }
+                actual += c
             }
         }
-        if (actual.isNotEmpty()) result.add(actual.trimEnd())
-        return result.ifEmpty { listOf("-") }
+        if (actual.isNotEmpty()) resultado.add(actual)
+        return resultado.ifEmpty { listOf("-") }
     }
 
-    private fun texto(value: String, x: Float, top: Float, size: Float, strong: Boolean = false, color: Color = ink) {
-        stream.setNonStrokingColor(color)
-        stream.beginText()
-        stream.setFont(if (strong) bold else regular, size)
-        stream.newLineAtOffset(x, -top - size)
-        stream.showText(limpio(value))
-        stream.endText()
+    /** Una linea; si se da `maximo`, se corta con «…» para que no invada lo de al lado. */
+    private fun texto(valor: String, x: Float, top: Float, size: Float, fuente: PDType1Font, color: Color, maximo: Float? = null) {
+        val s = stream ?: return
+        var t = limpio(valor, fuente)
+        if (maximo != null) while (t.length > 1 && anchoTexto(t, size, fuente) > maximo) t = t.dropLast(2) + "…".let { if (runCatching { fuente.encode(it) }.isSuccess) it else "." }
+        s.setNonStrokingColor(color)
+        s.beginText()
+        s.setFont(fuente, size)
+        s.newLineAtOffset(x, -top - size)
+        s.showText(t)
+        s.endText()
     }
 
-    private fun textoDerecha(value: String, right: Float, top: Float, size: Float, strong: Boolean = false, color: Color = ink) =
-        texto(value, right - ancho(value, size, strong), top, size, strong, color)
+    private fun textoDerecha(valor: String, derecha: Float, top: Float, size: Float, fuente: PDType1Font, color: Color) =
+        texto(valor, derecha - anchoTexto(valor, size, fuente), top, size, fuente, color)
 
-    private fun textoCentrado(value: String, cx: Float, top: Float, size: Float, strong: Boolean = false, color: Color = ink) =
-        texto(value, cx - ancho(value, size, strong) / 2f, top, size, strong, color)
-
-    // ---------- Formas ----------
-
-    private fun rect(x: Float, top: Float, w: Float, h: Float, color: Color) {
-        stream.setNonStrokingColor(color)
-        stream.addRect(x, -top - h, w, h)
-        stream.fill()
+    private fun parrafo(valor: String, x: Float, top: Float, maximo: Float, size: Float, fuente: PDType1Font, color: Color, alto: Float): Float {
+        val ls = lineas(valor, maximo, size, fuente)
+        ls.forEachIndexed { i, l -> texto(l, x, top + i * alto, size, fuente, color) }
+        return top + ls.size * alto
     }
 
-    private fun trazoLinea(x1: Float, x2: Float, top: Float, color: Color, lw: Float) {
-        stream.setStrokingColor(color)
-        stream.setLineWidth(lw)
-        stream.moveTo(x1, -top)
-        stream.lineTo(x2, -top)
-        stream.stroke()
+    private fun raya(top: Float) {
+        val s = stream ?: return
+        s.setStrokingColor(linea)
+        s.setLineWidth(0.6f)
+        s.moveTo(pad, -top)
+        s.lineTo(ancho - pad, -top)
+        s.stroke()
     }
 
-    private fun trazoVertical(x: Float, top1: Float, top2: Float, color: Color, lw: Float) {
-        stream.setStrokingColor(color)
-        stream.setLineWidth(lw)
-        stream.moveTo(x, -top1)
-        stream.lineTo(x, -top2)
-        stream.stroke()
-    }
-
-    private fun rutaRedondeada(x: Float, top: Float, w: Float, h: Float, r: Float) {
+    private fun redondeado(x: Float, top: Float, w: Float, h: Float, r: Float, color: Color) {
+        val s = stream ?: return
         val k = r * 0.5523f
         val yt = -top
         val yb = -top - h
-        stream.moveTo(x + r, yt)
-        stream.lineTo(x + w - r, yt)
-        stream.curveTo(x + w - r + k, yt, x + w, yt - r + k, x + w, yt - r)
-        stream.lineTo(x + w, yb + r)
-        stream.curveTo(x + w, yb + r - k, x + w - r + k, yb, x + w - r, yb)
-        stream.lineTo(x + r, yb)
-        stream.curveTo(x + r - k, yb, x, yb + r - k, x, yb + r)
-        stream.lineTo(x, yt - r)
-        stream.curveTo(x, yt - r + k, x + r - k, yt, x + r, yt)
-        stream.closePath()
-    }
-
-    private fun tarjeta(x: Float, top: Float, w: Float, h: Float, r: Float, fill: Color?, stroke: Color? = null, lw: Float = 0.7f) {
-        // Sin relleno ni borde no hay nada que dibujar.
-        if (fill == null && stroke == null) return
-
-        rutaRedondeada(x, top, w, h, r)
-        if (fill != null) stream.setNonStrokingColor(fill)
-        if (stroke != null) {
-            stream.setStrokingColor(stroke)
-            stream.setLineWidth(lw)
-        }
-        if (fill != null && stroke != null) stream.fillAndStroke()
-        else if (fill != null) stream.fill()
-        else stream.stroke()
-    }
-
-    // ---------- Cabecera y pie de página ----------
-
-    /** Se dibuja con el origen en la esquina superior izquierda de la cabecera. */
-    fun cabeceraPagina(id: String, fechaRegistro: String) {
-        val eyebrow = "REGISTRO DE OPERACIONES"
-        textoDerecha(eyebrow, width, 2f, 7f, true, steel)
-        tarjeta(width - ancho(eyebrow, 7f, true) - 9f - 2.2f, 6.5f - 2.2f, 4.4f, 4.4f, 2.2f, red)
-        textoDerecha("Registro de operación", width, 14f, 17f, true, blue)
-        textoDerecha("Información del registro y personas involucradas", width, 36f, 8f, false, steel)
-        textoDerecha("ID: $id  |  Fecha: $fechaRegistro", width, 48f, 8f, false, ink)
-        rect(0f, 62f, width, 1.2f, blue)
-        rect(0f, 62f, 40f, 1.2f, red)
-    }
-
-    /** Se dibuja con el origen en la esquina inferior izquierda (28, 27). */
-    fun pie(generado: String) {
-        trazoLinea(0f, width, -9f, line, 0.6f)
-        texto("INFORMA PERÚ  |  Registro de operaciones  |  Generado el $generado", 0f, 0f, 7f, false, steel)
-        textoDerecha("Página 1 de 1", width, 0f, 7f, true, steel)
-    }
-
-    // ---------- Franja de resumen ----------
-
-    private val pesosResumen = listOf(2.3f, 1f, 1.1f, 0.9f)
-
-    private fun anchosResumen(n: Int): List<Float> {
-        val pesos = if (n == pesosResumen.size) pesosResumen else List(n) { 1f }
-        val total = pesos.sum()
-        return pesos.map { (width - 32f) * it / total }
-    }
-
-    fun alturaResumen(items: List<Campo>): Float {
-        val anchos = anchosResumen(items.size)
-        return 22f + items.indices.maxOf { lineas(items[it].valor, anchos[it] - 14f, 9f, bold).size } * 11f + 10f
-    }
-
-    fun resumen(items: List<Campo>, top: Float): Float {
-        val h = alturaResumen(items)
-        val anchos = anchosResumen(items.size)
-        tarjeta(0f, top, width, h, 12f, pale, line, 0.7f)
-        rect(0f, top + 10f, 3f, h - 20f, blue) // acento lateral
-
-        var x = 16f
-        items.forEachIndexed { i, item ->
-            if (i > 0) trazoVertical(x - 8f, top + 12f, top + h - 12f, line, 0.6f)
-            texto(item.etiqueta.uppercase(), x, top + 10f, 6.3f, true, steel)
-            lineas(item.valor, anchos[i] - 14f, 9f, bold).forEachIndexed { j, linea ->
-                texto(linea, x, top + 22f + j * 11f, 9f, true, blue)
-            }
-            x += anchos[i]
-        }
-        return top + h
-    }
-
-    // ---------- Secciones ----------
-
-    private fun encabezadoTarjeta(numero: String, titulo: String, top: Float) {
-        tarjeta(14f, top + 8f, 16f, 16f, 8f, blue)
-        textoCentrado(numero, 22f, top + 11f, 8f, true, Color.WHITE)
-        texto(titulo, 38f, top + 9.5f, 10f, true, ink)
-        trazoLinea(14f, width - 14f, top + 31f, pale, 0.6f)
-    }
-
-    private fun anchoCampo(columnas: Int) = (width - 28f - (columnas - 1) * 12f) / columnas
-
-    private fun filaAltura(fields: List<Campo>, w: Float): Float =
-        11f + fields.maxOf { lineas(it.valor, w, 8.5f).size } * 10.5f + 9f
-
-    fun altura(section: Seccion): Float {
-        val w = anchoCampo(section.filas.maxOf { it.size })
-        return 40f + section.filas.sumOf { filaAltura(it, w).toDouble() }.toFloat() + 6f
-    }
-
-    fun seccion(section: Seccion, top: Float): Float {
-        val h = altura(section)
-        val columnas = section.filas.maxOf { it.size }
-        val w = anchoCampo(columnas)
-        tarjeta(0f, top, width, h, 10f, Color.WHITE, line, 0.7f)
-        encabezadoTarjeta(section.numero, section.titulo, top)
-
-        var y = top + 40f
-        section.filas.forEach { fields ->
-            val fh = filaAltura(fields, w)
-            fields.forEachIndexed { i, field ->
-                val x = 14f + i * (w + 12f)
-                texto(field.etiqueta.uppercase(), x, y, 6.3f, true, steel)
-                lineas(field.valor, w, 8.5f).forEachIndexed { j, linea ->
-                    texto(linea, x, y + 11f + j * 10.5f, 8.5f, false, ink)
-                }
-                trazoLinea(x, x + w, y + fh - 4f, pale, 0.6f)
-            }
-            y += fh
-        }
-        return top + h + separacion
-    }
-
-    // ---------- Beneficiarios ----------
-
-    private fun tableHeight(row: List<String>): Float =
-        row.indices.maxOf { lineas(row[it], tableWidths[it] - 12f, 7.5f).size } * 9f + 12f
-
-    fun alturaBeneficiarios(rows: List<List<String>>): Float =
-        40f + 22f + (if (rows.isEmpty()) 22f else rows.sumOf { tableHeight(it).toDouble() }.toFloat()) + 8f
-
-    fun beneficiarios(rows: List<List<String>>, top: Float) {
-        val h = alturaBeneficiarios(rows)
-        tarjeta(0f, top, width, h, 10f, Color.WHITE, line, 0.7f)
-        encabezadoTarjeta("V", "Beneficiarios múltiples (${rows.size})", top)
-
-        val labels = listOf("N.º", "Apellidos o razón social", "Tipo de documento", "N.º de documento", "Fecha de nacimiento")
-        val y0 = top + 40f
-        tarjeta(14f, y0, width - 28f, 20f, 5f, pale)
-        var x = 14f
-        labels.forEachIndexed { i, label ->
-            texto(label.uppercase(), x + 6f, y0 + 7f, 6.3f, true, steel)
-            x += tableWidths[i]
-        }
-
-        var y = y0 + 22f
-        if (rows.isEmpty()) texto("Sin beneficiarios registrados", 20f, y + 6f, 8f, false, steel)
-        rows.forEachIndexed { index, row ->
-            val rh = tableHeight(row)
-            if (index % 2 == 1) rect(14f, y, width - 28f, rh, soft)
-            x = 14f
-            row.forEachIndexed { i, value ->
-                lineas(value, tableWidths[i] - 12f, 7.5f).forEachIndexed { j, linea ->
-                    texto(linea, x + 6f, y + 6f + j * 9f, 7.5f, i == 0, if (i == 0) steel else ink)
-                }
-                x += tableWidths[i]
-            }
-            trazoLinea(14f, width - 14f, y + rh, pale, 0.5f)
-            y += rh
-        }
+        s.setNonStrokingColor(color)
+        s.moveTo(x + r, yt)
+        s.lineTo(x + w - r, yt)
+        s.curveTo(x + w - r + k, yt, x + w, yt - r + k, x + w, yt - r)
+        s.lineTo(x + w, yb + r)
+        s.curveTo(x + w, yb + r - k, x + w - r + k, yb, x + w - r, yb)
+        s.lineTo(x + r, yb)
+        s.curveTo(x + r - k, yb, x, yb + r - k, x, yb + r)
+        s.lineTo(x, yt - r)
+        s.curveTo(x, yt - r + k, x + r - k, yt, x + r, yt)
+        s.closePath()
+        s.fill()
     }
 }

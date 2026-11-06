@@ -124,4 +124,17 @@ class AislamientoEmpresaTest {
         acceso.comprobarRegistro(7L)
         verify(exactly = 0) { operaciones.findById(7L) }
     }
+
+    @Test
+    fun `el administrador que no indica cuenta registra a su nombre y lo ajeno trae su codigo`() {
+        entrar("admin", "Sulotec", rol = "ADMINISTRADOR")
+        val propio = acceso.registroDelActor(RegistroDto(oficina = "Lima"))
+        assertEquals("admin", propio.usuario)
+        assertEquals("1", propio.usuarioId)
+
+        entrar("ana", "Gamma")
+        every { operaciones.findById(7L) } returns Optional.of(registro(idDuenio = 5))
+        every { usuarios.findById(5) } returns Optional.of(usuario(5, "luis", "Delta"))
+        assertEquals("OPERACIONES_NO_ENCONTRADA", assertFailsWith<ResourceNotFoundException> { acceso.comprobarRegistro(7L) }.code)
+    }
 }

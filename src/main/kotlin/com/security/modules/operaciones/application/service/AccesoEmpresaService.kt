@@ -1,5 +1,6 @@
 package com.security.modules.operaciones.application.service
 
+import com.security.modules.operaciones.domain.RegistroOperacionesEntity
 import com.security.modules.operaciones.infraestructure.OperacionRepository
 import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.exceptions.ResourceNotFoundException
@@ -23,7 +24,15 @@ class AccesoEmpresaService(
     private val operacionRepository: OperacionRepository
 ) {
 
-    data class Actor(val id: Int, val usuario: String, val empresa: String?, val esAdministrador: Boolean)
+    data class Actor(
+        val id: Int,
+        val usuario: String,
+        val empresa: String?,
+        val esAdministrador: Boolean,
+        val nombreCompleto: String = usuario
+    ) {
+        fun autor() = AutorEvento(id, usuario, nombreCompleto)
+    }
 
     @Transactional(readOnly = true)
     fun actor(): Actor {
@@ -38,7 +47,8 @@ class AccesoEmpresaService(
             id = requireNotNull(cuenta.id),
             usuario = cuenta.usuario,
             empresa = limpiar(cuenta.empresa),
-            esAdministrador = autenticacion.esAdministrador()
+            esAdministrador = autenticacion.esAdministrador(),
+            nombreCompleto = nombreCompleto(cuenta)
         )
     }
 
@@ -64,7 +74,11 @@ class AccesoEmpresaService(
     @Transactional(readOnly = true)
     fun registroDelActor(registro: RegistroDto): RegistroDto {
         val actor = actor()
-        if (actor.esAdministrador) return registro
+        // El administrador universal puede registrar a nombre de otra cuenta; si no indica ninguna, queda a su nombre.
+        if (actor.esAdministrador && !registro.usuario.isNullOrBlank()) return registro
+        if (actor.esAdministrador) {
+            return registro.copy(usuarioId = actor.id.toString(), usuario = actor.usuario, empresa = actor.empresa ?: registro.empresa)
+        }
         val empresa = actor.empresa ?: throw SIN_EMPRESA()
         return registro.copy(usuarioId = actor.id.toString(), usuario = actor.usuario, empresa = empresa)
     }
@@ -79,13 +93,16 @@ class AccesoEmpresaService(
         if (actor.esAdministrador) return
         val empresa = actor.empresa ?: throw SIN_EMPRESA()
         val registro = operacionRepository.findById(id).orElse(null) ?: return
-        // La empresa de un registro es la de la cuenta dueña (igual que la lista); si esa cuenta ya no existe, la guardada.
-        val empresaRegistro = usuarioRepository.findById(registro.idUsuario).orElse(null)
-            ?.let { limpiar(it.empresa) } ?: registro.empresa
-        if (!empresaRegistro.trim().equals(empresa, ignoreCase = true)) {
-            throw ResourceNotFoundException("No existe un registro de operación con ID $id")
+        if (!empresaDelRegistro(registro).equals(empresa, ignoreCase = true)) {
+            throw ResourceNotFoundException("No existe un registro de operación con ID $id", CodigosOperaciones.NO_ENCONTRADA)
         }
     }
+
+    /** La empresa de un registro es la de la cuenta dueña (igual que la lista); si esa cuenta ya no existe, la guardada. */
+    @Transactional(readOnly = true)
+    fun empresaDelRegistro(registro: RegistroOperacionesEntity): String =
+        usuarioRepository.findById(registro.idUsuario).orElse(null)?.let { limpiar(it.empresa) }
+            ?: registro.empresa.trim()
 
     private fun limpiar(valor: String?): String? = valor?.trim()?.takeIf { it.isNotEmpty() }
 

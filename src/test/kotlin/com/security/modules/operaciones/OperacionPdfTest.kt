@@ -2,6 +2,8 @@
 
 import com.security.modules.operaciones.application.usecase.ExportarOperacionPdfUseCase
 import com.security.modules.operaciones.application.service.AccesoEmpresaService
+import com.security.modules.operaciones.application.service.AutorEvento
+import com.security.modules.operaciones.application.service.HistorialOperacionService
 import com.security.shared.exceptions.ResourceNotFoundException
 import org.springframework.http.MediaType
 import com.security.modules.operaciones.domain.*
@@ -27,9 +29,13 @@ import kotlin.test.*
 
 class OperacionPdfTest {
     private val repository = mockk<OperacionRepository>()
+    private val historial = mockk<HistorialOperacionService>(relaxed = true)
+    private val accesoPropio = mockk<AccesoEmpresaService>(relaxed = true).also {
+        every { it.actor() } returns AccesoEmpresaService.Actor(1, "usuario_prueba", "Empresa prueba", false, "Usuario Prueba")
+    }
     private val controller = OperacionPdfController(ExportarOperacionPdfUseCase(
-        OperacionConsultaAdapter(repository, mockk()), PdfBoxGeneradorPdfAdapter()
-    ), mockk(relaxed = true))
+        OperacionConsultaAdapter(repository, mockk()), PdfBoxGeneradorPdfAdapter(), historial
+    ), accesoPropio)
     private val mvc = MockMvcBuilders.standaloneSetup(controller).build()
 
     @Test
@@ -64,13 +70,16 @@ class OperacionPdfTest {
             assertTrue(response.getHeader("Content-Disposition")!!.contains("operacion_42.pdf"))
             Loader.loadPDF(response.contentAsByteArray).use { pdf ->
                 assertEquals(1, pdf.numberOfPages)
-                assertTrue(pdf.getPage(0).resources.xObjectNames.any {
-                    pdf.getPage(0).resources.getXObject(it) is PDImageXObject
-                }, "El PDF debe incluir el logo")
                 val texto = PDFTextStripper().getText(pdf)
-                listOf("OP-PRUEBA", "Ana", "Luis Beneficiario", "123.45", "usuario_prueba").forEach {
+                val codigo = response.getHeader("X-Codigo-Verificacion")!!
+                val huella = response.getHeader("X-Huella-Sha256")!!
+                assertTrue(Regex("[0-9A-F]{4}-[0-9A-F]{4}").matches(codigo))
+                assertEquals(64, huella.length)
+                assertEquals("1", response.getHeader("X-Paginas"))
+                listOf("OP-PRUEBA", "Ana", "Luis Beneficiario", "123.45", "usuario_prueba", "EMPRESA PRUEBA", codigo, huella).forEach {
                     assertTrue(texto.contains(it), "Falta $it en PDF")
                 }
+                verify { historial.descarga(42L, AutorEvento(1, "usuario_prueba", "Usuario Prueba"), any(), codigo, huella) }
                 if (ruta == "/api/operaciones") {
                     val output = Path.of("output", "pdf")
                     Files.createDirectories(output)

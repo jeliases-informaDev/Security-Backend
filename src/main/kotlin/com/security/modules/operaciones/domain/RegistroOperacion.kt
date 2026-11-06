@@ -5,13 +5,18 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "registro_operaciones_v2")
+// El numero es unico dentro de cada empresa (RO-AAAA-NNNNNN se repite entre empresas). EsquemaOperacionesInicializador
+// cambia el indice unico viejo (solo numero_registro) por este en las bases que ya existian.
+@Table(
+    name = "registro_operaciones_v2",
+    uniqueConstraints = [UniqueConstraint(name = "uk_reg_v2_empresa_numero", columnNames = ["empresa", "numero_registro"])]
+)
 class RegistroOperacionesEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
-    @Column(name = "numero_registro", nullable = false, unique = true, length = 50)
+    @Column(name = "numero_registro", nullable = false, length = 50)
     val numeroRegistro: String?,
 
     @Column(name = "id_usuario")

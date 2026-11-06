@@ -121,11 +121,11 @@ class CobroAccionesTest {
         every { licencias.claveDeterminista("u-1", "analista", TIPO_OPERACION_PDF, listOf("7")) } returns "clave-op"
         val controller = OperacionPdfController(exportar, mockk(relaxed = true), cobro)
 
-        every { exportar.ejecutar(7L) } returns byteArrayOf(1, 2, 3)
+        every { exportar.ejecutar(7L, any()) } returns com.security.modules.operaciones.application.usecase.PdfOperacion(byteArrayOf(1, 2, 3), "0000-0000", "h")
         assertEquals(3, controller.exportarPdf(7L).body!!.size)
         verify(exactly = 1) { licencias.consumirComo(quien, TIPO_OPERACION_PDF, "clave-op", any()) }
 
-        every { exportar.ejecutar(7L) } throws IllegalStateException("sin pdf")
+        every { exportar.ejecutar(7L, any()) } throws IllegalStateException("sin pdf")
         assertFailsWith<IllegalStateException> { controller.exportarPdf(7L) }
         verify(exactly = 1) { licencias.anular("clave-op") }
     }

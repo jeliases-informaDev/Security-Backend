@@ -16,7 +16,7 @@ import java.math.BigDecimal
 class OperacionDetalleTest {
     private val consulta = mockk<OperacionConsultaPort>()
     private val mvc = MockMvcBuilders.standaloneSetup(
-        OperacionDetalleController(ObtenerDetalleOperacionUseCase(consulta), mockk(), mockk(relaxed = true))
+        OperacionDetalleController(ObtenerDetalleOperacionUseCase(consulta), mockk(), mockk(relaxed = true), mockk(), mockk())
     ).setControllerAdvice(GlobalExceptionHandler()).build()
 
     @Test
@@ -43,12 +43,16 @@ class OperacionDetalleTest {
             .andExpect(jsonPath("$.operacion.cuenta1").value("000123"))
             .andExpect(jsonPath("$.operacion.monto").value(123.45))
             .andExpect(jsonPath("$.beneficiarios[0].nombre").value("Luis"))
+            .andExpect(jsonPath("$.estado").value("PENDIENTE"))
+            .andExpect(jsonPath("$.conservarHasta").value("2031-10-13"))
+            .andExpect(jsonPath("$.personaFisica.tipoPersona").value("NATURAL"))
     }
 
     @Test
     fun `devuelve 404 cuando no existe y 400 para ID invalido`() {
         every { consulta.obtenerParaExportacion(999) } returns null
         mvc.perform(get("/api/operaciones/999")).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("OPERACIONES_NO_ENCONTRADA"))
         mvc.perform(get("/api/operaciones/0")).andExpect(status().isBadRequest)
         mvc.perform(get("/api/operaciones/abc")).andExpect(status().isBadRequest)
         verify(exactly = 0) { consulta.obtenerParaExportacion(0) }

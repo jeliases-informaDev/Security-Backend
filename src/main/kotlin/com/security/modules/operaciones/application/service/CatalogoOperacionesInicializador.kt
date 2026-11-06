@@ -1,6 +1,8 @@
 package com.security.modules.operaciones.application.service
 
+import com.security.modules.operaciones.domain.CatalogoOperacionEntity
 import com.security.modules.operaciones.domain.Moneda
+import com.security.modules.operaciones.infraestructure.CatalogoOperacionRepository
 import com.security.modules.operaciones.domain.Provincia
 import com.security.modules.operaciones.infraestructure.MonedaRepository
 import com.security.modules.operaciones.infraestructure.ProvinciaRepository
@@ -30,7 +32,9 @@ class CatalogoOperacionesInicializador(
     private val monedaRepository: MonedaRepository,
     private val provinciaRepository: ProvinciaRepository,
     private val departamentoRepository: ScoringDepartamentoRepository,
-    transactionManager: PlatformTransactionManager
+    transactionManager: PlatformTransactionManager,
+    // Opciones del formulario nuevo (modalidad, origen de fondos, estado civil, tipo de documento y de operacion)
+    private val catalogoRegistroRepository: CatalogoOperacionRepository? = null
 ) : ApplicationRunner {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -51,7 +55,39 @@ class CatalogoOperacionesInicializador(
         } catch (e: Exception) {
             log.warn("No se pudieron preparar las provincias de Operaciones: {}", e.message)
         }
+        if (catalogoRegistroRepository != null) try {
+            tx.executeWithoutResult { sembrarCatalogosRegistro(leerCatalogosRegistro()) }
+        } catch (e: Exception) {
+            log.warn("No se pudieron preparar los catalogos del formulario de Operaciones: {}", e.message)
+        }
     }
+
+    /** Agrega las opciones que faltan (por catalogo y codigo); no cambia ni borra las que ya estan. */
+    internal fun sembrarCatalogosRegistro(filas: List<CatalogoOperacionEntity>): Int {
+        val repositorio = catalogoRegistroRepository ?: return 0
+        val existentes = repositorio.findAll().map { it.catalogo to it.codigo }.toSet()
+        val nuevas = filas.filter { (it.catalogo to it.codigo) !in existentes }
+        if (nuevas.isNotEmpty()) {
+            repositorio.saveAll(nuevas)
+            log.info("Operaciones: opciones de catalogo agregadas={}", nuevas.size)
+        }
+        return nuevas.size
+    }
+
+    /** Lee "catalogo;codigo;nombre;orden;pide_texto;sector" (con encabezado) desde el classpath. */
+    internal fun leerCatalogosRegistro(): List<CatalogoOperacionEntity> =
+        ClassPathResource(RUTA_CATALOGOS).inputStream.bufferedReader(Charsets.UTF_8).useLines { lineas ->
+            lineas.drop(1)
+                .filter { it.isNotBlank() }
+                .map { linea ->
+                    val c = linea.split(";").map { it.trim() }
+                    CatalogoOperacionEntity(
+                        catalogo = c[0], codigo = c[1], nombre = c[2], orden = c[3].toInt(),
+                        pideTexto = c[4].toBoolean(), sector = c.getOrNull(5)?.takeIf { it.isNotEmpty() }
+                    )
+                }
+                .toList()
+        }
 
     internal fun sembrarMonedas(): Int {
         val existentes = monedaRepository.findAll().mapNotNull { it.codigo?.trim()?.uppercase() }.toSet()
@@ -108,6 +144,7 @@ class CatalogoOperacionesInicializador(
 
     companion object {
         const val RUTA_PROVINCIAS = "operaciones/provincias.csv"
+        const val RUTA_CATALOGOS = "operaciones/catalogos-registro.csv"
 
         internal val MONEDAS = listOf(
             MonedaBase("PEN", "Soles", "S/"),

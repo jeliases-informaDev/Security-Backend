@@ -30,8 +30,20 @@ data class CabinaInicio(
     val tendencia: TendenciaCabina?,
     val mapa: MapaCabina?,
     val plazos: List<PlazoCabina>?,
-    val licencia: LicenciaCabina?
+    val licencia: LicenciaCabina?,
+    // CONTRATO-MUNDO.md: mapa mundial de calor (peso del riesgo por pais)
+    val mundo: MundoCabina? = null
 )
+
+data class MundoCabina(val periodoEtiqueta: String, val scoring: MundoScoring?, val listas: MundoListas?)
+
+data class MundoScoring(val paises: List<PaisScoring>, val sinPais: Long)
+
+data class PaisScoring(val nombre: String, val evaluaciones: Long, val altoRiesgo: Long, val puntajePromedio: Double?, val pesoPct: Double)
+
+data class MundoListas(val paises: List<PaisListas>, val sinPais: Long)
+
+data class PaisListas(val nombre: String, val consultas: Long, val conCoincidencia: Long, val pep: Long, val pesoPct: Double)
 
 data class ScoringCabina(
     val evaluaciones: Long,
@@ -135,7 +147,8 @@ class CabinaService(
             tendencia = parte("tendencia") { tendencia(a, finSerie) },
             mapa = parte("mapa") { mapa(a, periodo) },
             plazos = parte("plazos") { plazos(a) },
-            licencia = if (a.veLicencia) parte("licencia") { licencia(a.empresaLicencia) } else null
+            licencia = if (a.veLicencia) parte("licencia") { licencia(a.empresaLicencia) } else null,
+            mundo = parte("mundo") { mundo(a, periodo) }
         )
 
     private fun <T> parte(nombre: String, calculo: () -> T?): T? = try {
@@ -335,6 +348,41 @@ class CabinaService(
             }
         }
         return lista.sortedWith(compareBy<PlazoCabina> { it.vence }.thenBy { it.tipo }).take(MAX_PLAZOS)
+    }
+
+    // ================================================================== mapa mundial
+
+    /** Peso de un pais = su parte (en %) de la suma de puntajes (scoring) o de porcentajes (listas) de todos los paises. */
+    private fun mundo(a: AlcancesCabina, periodo: YearMonth): MundoCabina {
+        val desde = periodo.atDay(1).atStartOfDay()
+        val hasta = periodo.plusMonths(1).atDay(1).atStartOfDay()
+        fun peso(parte: Double, total: Double): Double =
+            if (total <= 0.0) 0.0 else BigDecimal(parte * 100.0 / total).setScale(1, RoundingMode.HALF_UP).toDouble()
+        val scoring = a.scoring?.let { al ->
+            val filas = consultas.scoringPorPais(al, desde, hasta).filter { !it.pais.isNullOrBlank() }
+            val total = filas.sumOf { it.sumaPuntaje.toDouble() }
+            MundoScoring(
+                paises = filas.map {
+                    PaisScoring(
+                        nombre = it.pais!!.trim(), evaluaciones = it.evaluaciones, altoRiesgo = it.altas,
+                        puntajePromedio = if (it.evaluaciones == 0L) null else redondear(it.sumaPuntaje.toDouble() / it.evaluaciones),
+                        pesoPct = peso(it.sumaPuntaje.toDouble(), total)
+                    )
+                }.sortedWith(compareByDescending<PaisScoring> { it.pesoPct }.thenBy { it.nombre }),
+                sinPais = consultas.scoringSinPais(al, desde, hasta)
+            )
+        }
+        val listas = a.listas?.let { al ->
+            val (con, sin) = consultas.consultasPorPais(al, desde, hasta).partition { !it.pais.isNullOrBlank() }
+            val total = con.sumOf { it.sumaPorcentaje }.toDouble()
+            MundoListas(
+                paises = con.map {
+                    PaisListas(it.pais!!.trim(), it.consultas, it.conCoincidencia, it.pep, peso(it.sumaPorcentaje.toDouble(), total))
+                }.sortedWith(compareByDescending<PaisListas> { it.pesoPct }.thenBy { it.nombre }),
+                sinPais = sin.sumOf { it.consultas }
+            )
+        }
+        return MundoCabina(InicioService.etiqueta(periodo), scoring, listas)
     }
 
     // ================================================================== licencia

@@ -125,6 +125,18 @@ class DemoInicioService(
             "Inmobiliaria Los Andes S.A.C.", "Constructora Pacífico S.A.C.", "Desarrollos Valle Verde S.A.C.",
             "Proyectos Urbanos Horizonte S.A.C.", "Edificaciones Costa Norte S.A.C.", "Inmobiliaria Altiplano S.A.C."
         )
+        /** Paises para el mapa mundial (los nombres de la tabla pais). Alto riesgo GAFI: Irán, Myanmar, Corea del Norte. */
+        private val PAISES_ALTO = listOf("Estados Unidos", "Irán", "Perú", "Myanmar", "Venezuela", "Corea del Norte", "Panamá", "Rusia")
+        private val PAISES_BAJO = listOf(
+            "Colombia", "México", "Chile", "Brasil", "Argentina", "Ecuador", "España", "Estados Unidos", "Francia", "Alemania",
+            "Reino Unido", "China", "Emiratos Árabes Unidos", "Turquía", "Bolivia"
+        )
+        private val PAISES_CRITICAS = listOf("Rusia", "Irán", "Venezuela", "Corea del Norte", "China", "Panamá")
+        private val PAISES_CONSULTAS = listOf(
+            "Estados Unidos", "Colombia", "México", "Chile", "Brasil", "Argentina", "Ecuador", "Bolivia", "Panamá", "España",
+            "Francia", "Alemania", "Reino Unido", "China", "Emiratos Árabes Unidos", "Turquía", "Venezuela"
+        )
+
         private val DIRECCIONES = listOf(
             "Av. Los Próceres 845", "Jr. Huallaga 312", "Calle Las Begonias 150", "Av. Ejército 1020", "Av. Grau 455",
             "Jr. Ayacucho 278", "Calle Los Pinos 96", "Av. Bolognesi 610"
@@ -409,6 +421,14 @@ class DemoInicioService(
         )
     }
 
+    /** Pais del consultado: las criticas, en paises con sanciones; PEP, Peru; el resto ~55 % Peru y 17 paises mas. */
+    private fun paisConsulta(p: PlanConsulta, i: Int): String = when {
+        p.tipo == Tipo.CRITICA -> PAISES_CRITICAS[i % PAISES_CRITICAS.size]
+        p.fila == "PEP_PERU" -> "Perú"
+        i % 20 < 11 -> "Perú"
+        else -> PAISES_CONSULTAS[(i / 20 + i) % PAISES_CONSULTAS.size]
+    }
+
     private fun consulta(
         admin: Usuario, empresa: String, uuid: String?, fecha: LocalDateTime, p: PlanConsulta, r: ResultadoListas, i: Int
     ): ConsultaLista {
@@ -421,7 +441,7 @@ class DemoInicioService(
             criterioApellidoPaterno = paterno, criterioApellidoMaterno = materno,
             criterioTexto = "$nombre $paterno $materno", modo = ConsultaLista.MODO_NOMBRE, totalCandidatos = if (p.fila == null) 0 else 1,
             coincidencia = if (p.fila == null) ConsultaLista.COINCIDENCIA_SIN_RESULTADOS else ConsultaLista.COINCIDENCIA_NOMBRE,
-            consultadoNombre = completo, tipoPersona = "NATURAL", consultadoPais = "Perú",
+            consultadoNombre = completo, tipoPersona = "NATURAL", consultadoPais = paisConsulta(p, i),
             porcentaje = r.porcentaje, clasificacion = r.clasificacion, listasConsultadas = r.listasConsultadas,
             listasConCoincidencia = r.listasConCoincidencia, registrosEnListas = r.registrosEnListas,
             noticiasEnMedios = r.noticiasEnMedios, esPep = r.esPep,
@@ -624,6 +644,10 @@ class DemoInicioService(
             .mapNotNull { porNombre[it] }.ifEmpty { return 0 }
         val ahora = reloj.ahora()
         val ids = mutableListOf<Int>()
+        // Pais de los fondos (mapa mundial): ~57 % Peru; las altas incluyen 3 paises de alto riesgo GAFI.
+        val grupos = paisGrupoRepository.todosConPais().filter { it.grupo != null }.associateBy { CalculoScoring.normalizar(it.pais.nombre ?: "") }
+        fun paisDe(nombre: String) = grupos[CalculoScoring.normalizar(nombre)] ?: pais
+        var bajas = 0
         for (k in 0 until 44) {
             // Nivel buscado: Alto (ocupacion y monto en 4: regla de dos factores en 4), Medio o Bajo.
             val objetivo = when {
@@ -648,7 +672,11 @@ class DemoInicioService(
                 medioPagoId = opcion(ScoringOpcion.MEDIO_PAGO, if (objetivo == 1) 1 else 2)?.id,
                 departamentoResidenciaId = depto.id,
                 departamentoOperacionId = depto.id,
-                paisFondosId = pais.pais.id
+                paisFondosId = when (objetivo) {
+                    4 -> paisDe(PAISES_ALTO[(k / 6) % PAISES_ALTO.size])
+                    3 -> paisDe("Perú")
+                    else -> (bajas++).let { b -> if (b % 7 in setOf(0, 2, 4)) paisDe("Perú") else paisDe(PAISES_BAJO[b % PAISES_BAJO.size]) }
+                }.pais.id
             )
             // Repartidas en los ultimos 30 dias, nunca en el futuro.
             val fecha = limitar(ahora.minusDays((k * 29L) / 43).withHour(9 + k % 9).withMinute((k * 13) % 60), ahora.minusDays(30))

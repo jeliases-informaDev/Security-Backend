@@ -63,6 +63,11 @@ va `null` y el resto sale igual.
   no tiene una fecha límite de envío).
 - `licencia`: la misma lectura que `GET /api/licencia` (caché y timeout del módulo de licencias); `null` si las licencias están
   apagadas, la empresa no tiene licencia o el servicio no responde. La ven el universal y el administrador de empresa (titular).
+- `mundo` (CONTRATO-MUNDO.md): mapa mundial por país del mes, con dos lentes. **Peso de un país = qué parte (en %) de todo el
+  riesgo del mes le toca**: en scoring, la suma de los puntajes de sus evaluaciones entre la suma de todos los países; en listas,
+  la suma de los porcentajes de coincidencia de sus consultas entre la suma de todos (si el total es 0, todos 0). Scoring: solo
+  versión 2 con país de los fondos (`sinPais` = las del mes sin país o de la versión 1). Listas: país consultado; vacío →
+  `sinPais`; `conCoincidencia` = clasificación Crítica o Media (la misma regla de la tarjeta). Ordenados por peso.
 - Demostración: además, 44 evaluaciones de scoring v2 calculadas y guardadas con `ScoringService` (sin consumir tokens; cliente
   con documento `DEMO-NNNN`), en 10 departamentos y los últimos 30 días, y registros en 8 departamentos.
 

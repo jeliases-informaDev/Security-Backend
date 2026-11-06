@@ -164,6 +164,11 @@ class InicioIntegracionTest {
             .andExpect(jsonPath("$.cabina.mapa.departamentos.length()").value(0))
             .andExpect(jsonPath("$.cabina.plazos.length()").value(0))
             .andExpect(jsonPath("$.cabina.licencia").value(nullValue()))
+            .andExpect(jsonPath("$.cabina.mundo.periodoEtiqueta").value("Noviembre 2026"))
+            .andExpect(jsonPath("$.cabina.mundo.scoring.paises.length()").value(0))
+            .andExpect(jsonPath("$.cabina.mundo.scoring.sinPais").value(0))
+            .andExpect(jsonPath("$.cabina.mundo.listas.paises.length()").value(0))
+            .andExpect(jsonPath("$.cabina.mundo.listas.sinPais").value(0))
     }
 
     @Test
@@ -261,6 +266,22 @@ class InicioIntegracionTest {
         assertEquals(dias.sorted(), dias)
         assertTrue(JsonPath.read<List<String>>(conDemo, "$.cabina.plazos[*].tipo").contains("DENUNCIA"))
 
+        // Mapa mundial: paises ordenados por peso, pesos que suman ~100, varios paises y focos de alto riesgo.
+        for (lente in listOf("scoring", "listas")) {
+            val pesos = JsonPath.read<List<Number>>(conDemo, "$.cabina.mundo.$lente.paises[*].pesoPct").map { it.toDouble() }
+            assertTrue(pesos.size >= (if (lente == "listas") 10 else 3), "$lente: ${pesos.size} paises")
+            assertEquals(pesos.sortedDescending(), pesos, lente)
+            assertTrue(kotlin.math.abs(pesos.sum() - 100.0) < 1.0, "$lente suma ${pesos.sum()}")
+            // La unica consulta real de la prueba no tiene pais: va a sinPais.
+            assertEquals(if (lente == "listas") 1 else 0, JsonPath.read<Number>(conDemo, "$.cabina.mundo.$lente.sinPais").toInt(), lente)
+        }
+        val nombresScoring = JsonPath.read<List<String>>(conDemo, "$.cabina.mundo.scoring.paises[*].nombre")
+        assertTrue("Perú" in nombresScoring, "paises: $nombresScoring")
+        val evaluacionesPais = JsonPath.read<List<Number>>(conDemo, "$.cabina.mundo.scoring.paises[*].evaluaciones").sumOf { it.toLong() }
+        assertEquals(evaluaciones, evaluacionesPais)
+        assertEquals(313L, JsonPath.read<List<Number>>(conDemo, "$.cabina.mundo.listas.paises[*].consultas").sumOf { it.toLong() } +
+            JsonPath.read<Number>(conDemo, "$.cabina.mundo.listas.sinPais").toLong() - 0L)
+
         // Lo que se ve en pantalla no dice «demo» en ningun lado: nombres, documentos y codigos con el formato de siempre.
         assertTrue(Regex("""RO-2026-9\d{5}""").matches(JsonPath.read<String>(conDemo, "$.operaciones.ultimos[0].codigo")))
         val pantallas = mapOf(
@@ -283,6 +304,8 @@ class InicioIntegracionTest {
         val (_, otra) = cuenta(empresa(), "ADMINISTRADOR")
         get("/api/inicio/resumen", otra)
             .andExpect(jsonPath("$.demo.cargado").value(false))
+            .andExpect(jsonPath("$.cabina.mundo.scoring.paises.length()").value(0))
+            .andExpect(jsonPath("$.cabina.mundo.listas.paises.length()").value(0))
             .andExpect(jsonPath("$.listas.consultas").value(0))
             .andExpect(jsonPath("$.operaciones.registros").value(0))
             .andExpect(jsonPath("$.denuncias.recibidas").value(0))

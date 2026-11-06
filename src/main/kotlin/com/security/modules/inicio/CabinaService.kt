@@ -11,6 +11,7 @@ import com.security.modules.oficial.aplicacion.ReglasOficialService
 import com.security.modules.oficial.aplicacion.ReglasPorDefecto
 import com.security.modules.oficial.dominio.Plazo
 import com.security.modules.scoring.domain.metodologia.CalculoScoring
+import com.security.modules.scoring.infrastructure.CatalogoPaisesIso
 import com.security.modules.scoring.domain.metodologia.MetodologiaV2
 import com.security.modules.scoring.domain.metodologia.Nivel
 import org.slf4j.LoggerFactory
@@ -30,8 +31,20 @@ data class CabinaInicio(
     val tendencia: TendenciaCabina?,
     val mapa: MapaCabina?,
     val plazos: List<PlazoCabina>?,
-    val licencia: LicenciaCabina?
+    val licencia: LicenciaCabina?,
+    // CONTRATO-MUNDO.md: mapa mundial de calor (peso del riesgo por pais)
+    val mundo: MundoCabina? = null
 )
+
+data class MundoCabina(val periodoEtiqueta: String, val scoring: MundoScoring?, val listas: MundoListas?)
+
+data class MundoScoring(val paises: List<PaisScoring>, val sinPais: Long)
+
+data class PaisScoring(val nombre: String, val codigo: String?, val evaluaciones: Long, val altoRiesgo: Long, val puntajePromedio: Double?, val pesoPct: Double)
+
+data class MundoListas(val paises: List<PaisListas>, val sinPais: Long)
+
+data class PaisListas(val nombre: String, val codigo: String?, val consultas: Long, val conCoincidencia: Long, val pep: Long, val pesoPct: Double)
 
 data class ScoringCabina(
     val evaluaciones: Long,
@@ -135,7 +148,8 @@ class CabinaService(
             tendencia = parte("tendencia") { tendencia(a, finSerie) },
             mapa = parte("mapa") { mapa(a, periodo) },
             plazos = parte("plazos") { plazos(a) },
-            licencia = if (a.veLicencia) parte("licencia") { licencia(a.empresaLicencia) } else null
+            licencia = if (a.veLicencia) parte("licencia") { licencia(a.empresaLicencia) } else null,
+            mundo = parte("mundo") { mundo(a, periodo) }
         )
 
     private fun <T> parte(nombre: String, calculo: () -> T?): T? = try {
@@ -335,6 +349,53 @@ class CabinaService(
             }
         }
         return lista.sortedWith(compareBy<PlazoCabina> { it.vence }.thenBy { it.tipo }).take(MAX_PLAZOS)
+    }
+
+    // ================================================================== mapa mundial
+
+    /** Peso de un pais = su parte (en %) de la suma de puntajes (scoring) o de porcentajes (listas) de todos los paises. */
+    private fun mundo(a: AlcancesCabina, periodo: YearMonth): MundoCabina {
+        val desde = periodo.atDay(1).atStartOfDay()
+        val hasta = periodo.plusMonths(1).atDay(1).atStartOfDay()
+        fun peso(parte: Double, total: Double): Double =
+            if (total <= 0.0) 0.0 else BigDecimal(parte * 100.0 / total).setScale(1, RoundingMode.HALF_UP).toDouble()
+        // Se agrupa por codigo ISO cuando el nombre se reconoce (suma los estilos distintos del mismo pais; nombre = el de la
+        // fila con mas datos) y por nombre cuando no.
+        fun <F> agrupar(filas: List<F>, nombre: (F) -> String, cantidad: (F) -> Long): List<Triple<String, String?, List<F>>> =
+            filas.groupBy { f -> CatalogoPaisesIso.codigo(nombre(f))?.let { "ISO:$it" } ?: "NOMBRE:${nombre(f)}" }
+                .map { (clave, grupo) ->
+                    Triple(nombre(grupo.maxBy { cantidad(it) }), clave.removePrefix("ISO:").takeIf { clave.startsWith("ISO:") }, grupo)
+                }
+        val scoring = a.scoring?.let { al ->
+            val filas = consultas.scoringPorPais(al, desde, hasta).filter { !it.pais.isNullOrBlank() }
+            val total = filas.sumOf { it.sumaPuntaje.toDouble() }
+            MundoScoring(
+                paises = agrupar(filas, { it.pais!!.trim() }, { it.evaluaciones }).map { (nombre, codigo, g) ->
+                    val evaluaciones = g.sumOf { it.evaluaciones }
+                    val suma = g.sumOf { it.sumaPuntaje.toDouble() }
+                    PaisScoring(
+                        nombre = nombre, codigo = codigo, evaluaciones = evaluaciones, altoRiesgo = g.sumOf { it.altas },
+                        puntajePromedio = if (evaluaciones == 0L) null else redondear(suma / evaluaciones),
+                        pesoPct = peso(suma, total)
+                    )
+                }.sortedWith(compareByDescending<PaisScoring> { it.pesoPct }.thenBy { it.nombre }),
+                sinPais = consultas.scoringSinPais(al, desde, hasta)
+            )
+        }
+        val listas = a.listas?.let { al ->
+            val (con, sin) = consultas.consultasPorPais(al, desde, hasta).partition { !it.pais.isNullOrBlank() }
+            val total = con.sumOf { it.sumaPorcentaje }.toDouble()
+            MundoListas(
+                paises = agrupar(con, { it.pais!!.trim() }, { it.consultas }).map { (nombre, codigo, g) ->
+                    PaisListas(
+                        nombre, codigo, g.sumOf { it.consultas }, g.sumOf { it.conCoincidencia }, g.sumOf { it.pep },
+                        peso(g.sumOf { it.sumaPorcentaje }.toDouble(), total)
+                    )
+                }.sortedWith(compareByDescending<PaisListas> { it.pesoPct }.thenBy { it.nombre }),
+                sinPais = sin.sumOf { it.consultas }
+            )
+        }
+        return MundoCabina(InicioService.etiqueta(periodo), scoring, listas)
     }
 
     // ================================================================== licencia

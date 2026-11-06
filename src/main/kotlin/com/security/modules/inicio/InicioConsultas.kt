@@ -29,6 +29,10 @@ data class FilaUltimoRegistro(
 
 data class UbicacionRegistros(val departamento: String?, val provincia: String?, val registros: Long, val montoUsd: BigDecimal)
 
+data class PaisScoringFila(val pais: String?, val evaluaciones: Long, val altas: Long, val sumaPuntaje: BigDecimal)
+
+data class PaisListasFila(val pais: String?, val consultas: Long, val conCoincidencia: Long, val pep: Long, val sumaPorcentaje: Long)
+
 data class AbiertasDenuncias(val porAtender: Long, val sinAbrir: Long, val vencidas: Long)
 
 /**
@@ -340,6 +344,61 @@ class InicioConsultas(private val em: EntityManager) {
         ).setMaxResults(cuantas).resultList.map {
             val r = it as Array<*>
             Triple((r[0] as Number).toInt(), r[1] as String?, r[2] as LocalDateTime)
+        }
+
+    // ------------------------------------------------------------------ Cabina: mapa mundial (por pais)
+
+    private val alcanceScoringTexto =
+        "(:todo = true OR (:empresa IS NOT NULL AND LOWER(TRIM(u.empresa)) = LOWER(TRIM(:empresa))) OR u.id = :usuarioId)"
+
+    /** Evaluaciones v2 del periodo por pais de los fondos: [pais, evaluaciones, altas, suma de puntajes]. */
+    @Transactional(readOnly = true)
+    fun scoringPorPais(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): List<PaisScoringFila> =
+        alcanceScoring(
+            em.createQuery(
+                """
+                SELECT p.nombre, COUNT(s), SUM(CASE WHEN s.nivel = 'ALTO' THEN 1 ELSE 0 END), SUM(s.puntaje)
+                FROM ScoringRiesgo s JOIN s.usuario u JOIN s.paisFondos p
+                WHERE s.version = 2 AND $alcanceScoringTexto AND s.fechaCreacion >= :desde AND s.fechaCreacion < :hasta
+                GROUP BY p.nombre
+                """
+            ), a, desde, hasta
+        ).resultList.map {
+            val r = it as Array<*>
+            PaisScoringFila(r[0]?.toString(), n(r[1]), n(r[2]), decimal(r[3]) ?: BigDecimal.ZERO)
+        }
+
+    /** Evaluaciones del periodo sin pais de los fondos (version 1 o sin dato). */
+    @Transactional(readOnly = true)
+    fun scoringSinPais(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): Long =
+        n(
+            alcanceScoring(
+                em.createQuery(
+                    """
+                    SELECT COUNT(s) FROM ScoringRiesgo s JOIN s.usuario u
+                    WHERE $alcanceScoringTexto AND s.fechaCreacion >= :desde AND s.fechaCreacion < :hasta
+                      AND (s.version IS NULL OR s.version <> 2 OR s.paisFondos IS NULL)
+                    """
+                ), a, desde, hasta
+            ).singleResult
+        )
+
+    /** Consultas resueltas del periodo por pais consultado: [pais, consultas, con coincidencia, PEP, suma de porcentajes]. */
+    @Transactional(readOnly = true)
+    fun consultasPorPais(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): List<PaisListasFila> =
+        alcanceListas(
+            em.createQuery(
+                """
+                SELECT TRIM(c.consultadoPais), COUNT(c),
+                       SUM(CASE WHEN c.clasificacion IN ('CRITICA', 'MEDIA') THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN c.esPep = true THEN 1 ELSE 0 END), SUM(COALESCE(c.porcentaje, 0))
+                $baseConsultas AND c.fecha >= :desde AND c.fecha < :hasta
+                GROUP BY TRIM(c.consultadoPais)
+                """
+            ), a
+        ).setParameter("desde", desde).setParameter("hasta", hasta).resultList.map {
+            val r = it as Array<*>
+            PaisListasFila(r[0]?.toString(), n(r[1]), n(r[2]), n(r[3]), n(r[4]))
         }
 
     // ------------------------------------------------------------------ piezas

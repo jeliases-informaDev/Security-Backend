@@ -114,7 +114,7 @@ class DenunciasEmpresaTest {
 
     @Test
     fun `al listar, el administrador de empresa consulta por su empresa, el universal todo y el supervisor lo suyo`() {
-        val caso = ListarDenunciasUseCase(denuncias, autorizacion)
+        val caso = ListarDenunciasUseCase(denuncias, autorizacion, com.security.modules.denuncias.application.service.PlazoDenunciasService(30))
         every { denuncias.buscarPorEmpresa("Gamma") } returns emptyList()
         every { denuncias.buscarPorEmpresaYEstado("Gamma", EstadoDenuncia.values().first()) } returns emptyList()
         every { denuncias.findAllByOrderByFechaCreacionDesc() } returns emptyList()

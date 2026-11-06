@@ -1,5 +1,9 @@
 package com.security.modules.denuncias.application.usecase
 
+import com.security.modules.denuncias.application.service.DerivacionResponse
+import com.security.modules.denuncias.application.service.PlazoDenunciasService
+import com.security.modules.denuncias.application.service.ReservaOficial
+
 import com.security.modules.denuncias.application.dto.DenunciaArchivoResponse
 import com.security.modules.denuncias.application.dto.DenunciaDetalleResponse
 import com.security.modules.denuncias.application.dto.DenunciaHistorialResponse
@@ -32,7 +36,10 @@ class ObtenerDenunciaUseCase(
     DenunciaHistorialRepository,
 
     private val autorizacionDenunciaService:
-    AutorizacionDenunciaService
+    AutorizacionDenunciaService,
+
+    private val plazo:
+    PlazoDenunciasService
 
 ) {
 
@@ -189,6 +196,8 @@ class ObtenerDenunciaUseCase(
         // RESPUESTA
         // =====================================================
 
+        val reservado = ReservaOficial.puedeVerReservado(usuarioResponsable)
+
         return DenunciaDetalleResponse(
 
             id =
@@ -280,7 +289,24 @@ class ObtenerDenunciaUseCase(
                 denuncia.fechaActualizacion,
 
             fechaCierre =
-                denuncia.fechaCierre
+                denuncia.fechaCierre,
+
+            causaEtiqueta = denuncia.causa.etiqueta,
+            estadoEtiqueta = denuncia.estado.etiqueta,
+            fechaLimiteAtencion = plazo.fechaLimite(denuncia),
+            diasParaVencer = plazo.diasParaVencer(denuncia),
+            vencida = plazo.vencida(denuncia),
+            atendidaATiempo = plazo.atendidaATiempo(denuncia),
+            resultadoCierre = denuncia.resultadoCierre,
+            resultadoCierreEtiqueta = denuncia.resultadoCierre?.etiqueta,
+            motivoCierre = denuncia.motivoCierre,
+            derivadaAlOficial = if (reservado) denuncia.derivadaAlOficial else null,
+            derivacion = if (reservado && denuncia.derivadaAlOficial) DerivacionResponse(
+                fechaDerivacion = denuncia.fechaDerivacion,
+                derivadaPorUsuarioId = denuncia.derivadaPorUsuario?.id,
+                derivadaPor = nombreUsuario(denuncia.derivadaPorUsuario),
+                motivo = denuncia.motivoDerivacion
+            ) else null
         )
     }
 

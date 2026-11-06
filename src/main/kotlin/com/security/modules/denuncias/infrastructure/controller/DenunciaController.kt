@@ -1,5 +1,14 @@
 package com.security.modules.denuncias.infrastructure.controller
 
+import com.security.modules.denuncias.application.dto.DerivarOficialRequest
+import com.security.modules.denuncias.application.service.CatalogoDenunciasResponse
+import com.security.modules.denuncias.application.service.DenunciaException
+import com.security.modules.denuncias.application.service.PlazoDenunciasService
+import com.security.modules.denuncias.application.usecase.DerivarDenunciaOficialUseCase
+import com.security.shared.exceptions.ApiErrorResponse
+import jakarta.servlet.http.HttpServletRequest
+import org.springframework.web.bind.annotation.ExceptionHandler
+
 import com.security.modules.denuncias.application.dto.ActualizarEstadoDenunciaRequest
 import com.security.modules.denuncias.application.dto.ConsultarDenunciaRequest
 import com.security.modules.denuncias.application.dto.ConsultarDenunciaResponse
@@ -81,9 +90,46 @@ class DenunciaController(
     DescargarDocumentoDenunciaUseCase,
 
     private val usuarioRepository:
-    UsuarioRepository
+    UsuarioRepository,
+
+    private val derivarDenunciaOficialUseCase:
+    DerivarDenunciaOficialUseCase,
+
+    private val plazoDenuncias:
+    PlazoDenunciasService
 
 ) {
+
+    // =========================================================
+    // CATALOGO: situaciones, estados y resultados del cierre con sus etiquetas
+    // =========================================================
+
+    @GetMapping("/catalogo")
+    fun catalogo(): ResponseEntity<CatalogoDenunciasResponse> =
+        ResponseEntity.ok(plazoDenuncias.catalogo())
+
+    // =========================================================
+    // DERIVAR AL OFICIAL DE CUMPLIMIENTO (reservado; idempotente)
+    // =========================================================
+
+    @PostMapping("/{id}/derivar-oficial")
+    fun derivarOficial(
+        principal: Principal,
+        @PathVariable id: Int,
+        @RequestBody(required = false) request: DerivarOficialRequest?
+    ): ResponseEntity<DenunciaDetalleResponse> =
+        ResponseEntity.ok(
+            derivarDenunciaOficialUseCase.ejecutar(id, request?.motivo, obtenerUsuarioAutenticado(principal))
+        )
+
+    @ExceptionHandler(DenunciaException::class)
+    fun errorDenuncia(ex: DenunciaException, request: HttpServletRequest): ResponseEntity<ApiErrorResponse> =
+        ResponseEntity.status(ex.status).contentType(MediaType.APPLICATION_JSON).body(
+            ApiErrorResponse(
+                status = ex.status.value(), error = ex.status.reasonPhrase, message = ex.message ?: "Solicitud inválida",
+                path = request.requestURI, code = ex.code
+            )
+        )
 
     // =========================================================
     // REGISTRAR DENUNCIA

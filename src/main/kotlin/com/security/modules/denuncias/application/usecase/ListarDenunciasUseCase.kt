@@ -1,5 +1,8 @@
 package com.security.modules.denuncias.application.usecase
 
+import com.security.modules.denuncias.application.service.PlazoDenunciasService
+import com.security.modules.denuncias.application.service.ReservaOficial
+
 import com.security.modules.denuncias.application.dto.DenunciaResumenResponse
 import com.security.modules.denuncias.application.service.AutorizacionDenunciaService
 import com.security.modules.denuncias.domain.enums.EstadoDenuncia
@@ -17,7 +20,10 @@ class ListarDenunciasUseCase(
     DenunciaRepository,
 
     private val autorizacionDenunciaService:
-    AutorizacionDenunciaService
+    AutorizacionDenunciaService,
+
+    private val plazo:
+    PlazoDenunciasService
 
 ) {
 
@@ -84,8 +90,9 @@ class ListarDenunciasUseCase(
             }
 
 
+        val reservado = ReservaOficial.puedeVerReservado(usuarioResponsable)
         return denuncias.map {
-            toResumen(it)
+            toResumen(it, reservado)
         }
     }
 
@@ -177,7 +184,8 @@ class ListarDenunciasUseCase(
     // =========================================================
 
     private fun toResumen(
-        denuncia: DenunciaEntity
+        denuncia: DenunciaEntity,
+        reservado: Boolean
     ): DenunciaResumenResponse {
 
         return DenunciaResumenResponse(
@@ -212,7 +220,18 @@ class ListarDenunciasUseCase(
                 denuncia.fechaCreacion,
 
             fechaCierre =
-                denuncia.fechaCierre
+                denuncia.fechaCierre,
+
+            causaEtiqueta = denuncia.causa.etiqueta,
+            estadoEtiqueta = denuncia.estado.etiqueta,
+            fechaLimiteAtencion = plazo.fechaLimite(denuncia),
+            diasParaVencer = plazo.diasParaVencer(denuncia),
+            vencida = plazo.vencida(denuncia),
+            atendidaATiempo = plazo.atendidaATiempo(denuncia),
+            resultadoCierre = denuncia.resultadoCierre,
+            resultadoCierreEtiqueta = denuncia.resultadoCierre?.etiqueta,
+            motivoCierre = denuncia.motivoCierre,
+            derivadaAlOficial = if (reservado) denuncia.derivadaAlOficial else null
         )
     }
 

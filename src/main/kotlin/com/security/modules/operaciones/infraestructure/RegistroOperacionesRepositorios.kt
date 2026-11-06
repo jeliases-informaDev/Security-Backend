@@ -67,6 +67,7 @@ class NumeradorRegistros(
             """
             SELECT COALESCE(MAX(CAST(SUBSTRING(numero_registro, 9) AS UNSIGNED)), 0) FROM registro_operaciones_v2
             WHERE LOWER(TRIM(empresa)) = :empresa AND numero_registro LIKE :patron
+              AND id NOT IN (SELECT m.id_fila FROM inicio_demo_marca m WHERE m.tipo = 'REGISTRO')
             """
         )
             .setParameter("empresa", clave)

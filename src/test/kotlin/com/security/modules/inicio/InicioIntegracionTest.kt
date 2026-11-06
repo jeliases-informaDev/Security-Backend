@@ -261,6 +261,24 @@ class InicioIntegracionTest {
         assertEquals(dias.sorted(), dias)
         assertTrue(JsonPath.read<List<String>>(conDemo, "$.cabina.plazos[*].tipo").contains("DENUNCIA"))
 
+        // Lo que se ve en pantalla no dice «demo» en ningun lado: nombres, documentos y codigos con el formato de siempre.
+        assertTrue(Regex("""RO-2026-9\d{5}""").matches(JsonPath.read<String>(conDemo, "$.operaciones.ultimos[0].codigo")))
+        val pantallas = mapOf(
+            "inicio" to conDemo.replace("\"demo\":", "\"_\":"),
+            "listas" to cuerpo(get("/api/listas-negativas/consultas?size=50", t).andExpect(status().isOk)),
+            "operaciones" to cuerpo(get("/api/operaciones/resumen", t).andExpect(status().isOk)),
+            "denuncias" to cuerpo(get("/api/denuncias", t).andExpect(status().isOk)),
+            "scoring" to cuerpo(get("/api/scoring/historial?size=50", t).andExpect(status().isOk)),
+            "oficial" to cuerpo(get("/api/oficial-cumplimiento/estado", t).andExpect(status().isOk))
+        )
+        pantallas.forEach { (nombre, texto) ->
+            assertTrue(!texto.contains("demo", ignoreCase = true), "$nombre muestra «demo»: " + Regex("(?i).{0,60}demo.{0,60}").find(texto)?.value)
+        }
+        val codigosDenuncia = JsonPath.read<List<String?>>(pantallas.getValue("denuncias"), "$[*].codigoSeguimiento").filterNotNull()
+        assertTrue(codigosDenuncia.isEmpty() && denuncias.findAll().any { d -> d.creadoPorUsuario?.id == admin.id && Regex("""DEN-2026-\d{6}""").matches(d.codigoSeguimiento ?: "") } || codigosDenuncia.any { Regex("""DEN-2026-\d{6}""").matches(it) }, "codigos: $codigosDenuncia")
+        val evaluacion = JsonPath.read<Number>(pantallas.getValue("scoring"), "$.content[0].id").toInt()
+        get("/api/scoring/$evaluacion", t).andExpect(status().isOk).andExpect(jsonPath("$.cliente.documento").value(org.hamcrest.Matchers.startsWith("9")))
+
         // Otra empresa no ve nada de esto.
         val (_, otra) = cuenta(empresa(), "ADMINISTRADOR")
         get("/api/inicio/resumen", otra)

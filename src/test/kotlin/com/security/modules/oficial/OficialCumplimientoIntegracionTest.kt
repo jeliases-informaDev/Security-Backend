@@ -155,7 +155,7 @@ class OficialCumplimientoIntegracionTest {
     // ------------------------------------------------------------ pruebas
 
     @Test
-    fun `ciclo completo: designar, comunicar, cambiar datos, comunicar el cambio, remover y volver a designar`() {
+    fun `ciclo completo, designar, comunicar, cambiar datos, comunicar el cambio, remover y volver a designar`() {
         val a = empresa()
         val admin = token(a.nombre, "ADMINISTRADOR_EMPRESA")
 
@@ -295,7 +295,7 @@ class OficialCumplimientoIntegracionTest {
     }
 
     @Test
-    fun `una empresa no ve ni toca nada de otra en ninguna ruta; el administrador universal si`() {
+    fun `una empresa no ve ni toca nada de otra en ninguna ruta y el administrador universal si`() {
         val a = empresa()
         val b = empresa()
         val adminA = token(a.nombre, "ADMINISTRADOR_EMPRESA")

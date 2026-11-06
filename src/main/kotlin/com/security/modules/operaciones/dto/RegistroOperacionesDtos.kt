@@ -35,7 +35,10 @@ data class IndicadoresOperacionesResponse(
     val registrosDelPeriodo: Long,
     val pendientesDeEnvio: Long,
     val sinResponsable: Long,
-    val total: Long
+    val total: Long,
+    val enviados: Long = 0,
+    val inusualesEnAnalisis: Long = 0,
+    val sospechosas: Long = 0
 )
 
 data class RegistroCreadoResponse(
@@ -45,7 +48,8 @@ data class RegistroCreadoResponse(
     val creadoEn: LocalDateTime,
     val estado: String,
     val responsable: UsuarioAsignableResponse?,
-    val mensaje: String = "Operacion registrada correctamente"
+    val mensaje: String = "Operacion registrada correctamente",
+    val umbral: VerificacionUmbralResponse? = null
 )
 
 data class EdicionOperacionResponse(
@@ -67,7 +71,11 @@ data class FiltrosOperaciones(
     val moneda: String? = null,
     val monedaId: Long? = null,
     val responsableId: Int? = null,
-    val sinResponsable: Boolean = false
+    val sinResponsable: Boolean = false,
+    val estados: Set<String> = emptySet(),
+    val oficina: String? = null,
+    val montoMinUsd: BigDecimal? = null,
+    val montoMaxUsd: BigDecimal? = null
 )
 
 /** Fila de la lista tal como sale de la base (ListaOperacionesConsulta). */
@@ -85,5 +93,9 @@ data class FilaOperacion(
     val monto: BigDecimal?,
     val moneda: String?,
     val responsableId: Int?,
-    val responsableNombre: String?
+    val responsableNombre: String?,
+    val estadoAnalisis: String? = null,
+    val fechaEnvio: LocalDate? = null,
+    val montoUsd: BigDecimal? = null,
+    val umbralEstado: String? = null
 )

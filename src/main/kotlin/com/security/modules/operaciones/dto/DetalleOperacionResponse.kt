@@ -15,5 +15,9 @@ data class DetalleOperacionResponse(
     val estado: String = "PENDIENTE",
     val responsable: UsuarioAsignableResponse? = null,
     val conservarHasta: LocalDate? = null,
-    val historialReciente: List<EventoOperacionResponse> = emptyList()
+    val historialReciente: List<EventoOperacionResponse> = emptyList(),
+    val estadoEnvio: String = "PENDIENTE",
+    val umbral: VerificacionUmbralResponse? = null,
+    val inusualidad: InusualidadResumen? = null,
+    val envio: EnvioResumen? = null
 )

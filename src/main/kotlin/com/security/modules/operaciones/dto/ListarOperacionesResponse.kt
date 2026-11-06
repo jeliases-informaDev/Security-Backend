@@ -32,5 +32,9 @@ data class OperacionItemDto(
     val moneda: String? = null,
     val monedaCodigo: String? = null,
     val monedaSimbolo: String? = null,
-    val estado: String = "PENDIENTE"
+    val estado: String = "PENDIENTE",
+    val estadoEnvio: String = "PENDIENTE",
+    val inusualidad: String = "SIN_ANALISIS",
+    val montoUsd: BigDecimal? = null,
+    val umbralEstado: String? = null
 )

@@ -30,7 +30,9 @@ class AltaOperacionService(
     private val catalogos: CatalogosRegistro,
     private val numerador: NumeradorRegistros,
     private val historial: HistorialOperacionService,
-    private val cobro: CobroAcciones? = null
+    private val cobro: CobroAcciones? = null,
+    private val umbrales: UmbralService? = null,
+    private val configuracion: ConfiguracionOperacionesService? = null
 ) {
 
     /** `request.registro` ya viene resuelto por AccesoEmpresaService.registroDelActor (cuenta dueña y empresa). */
@@ -49,11 +51,16 @@ class AltaOperacionService(
             ?: request.registro.empresa?.trim()?.takeIf { it.isNotEmpty() }
             ?: throw ResponseStatusException(HttpStatus.FORBIDDEN, "La cuenta no tiene una empresa asignada")
 
-        val formulario = ValidadorOperacion(catalogos.cargar()).validar(
+        val cat = catalogos.cargar()
+        val oficinas = configuracion?.de(empresa, cat)?.oficinas.orEmpty()
+        val formulario = ValidadorOperacion(cat, oficinas = oficinas).validar(
             request.registro.oficina, request.personaFisica, request.personaRepresentada, request.operacion, request.beneficiarios
         )
         val ahora = LocalDateTime.now(ZONA_LIMA).withNano(0)
         val responsable = usuarioRepository.findById(cuenta.id).orElse(null)
+        // Verificacion de umbral: informativa, nunca bloquea; queda guardada con el registro
+        val verificacion = umbrales?.evaluar(empresa, formulario.operacion.tipoOperacion, formulario.operacion.moneda,
+            formulario.monto, formulario.fechaOperacion, cat)
 
         val guardado = cobro.conCobro(TIPO_OPERACION_REGISTRAR, "registro de operacion") {
             val registro = operacionRepository.saveAndFlush(
@@ -66,12 +73,18 @@ class AltaOperacionService(
                     fechaCreacion = ahora,
                     personaFisica = EscritorOperacion.persona(Persona(), formulario.personaFisica),
                     personaRepresentada = formulario.personaRepresentada?.let { EscritorOperacion.persona(Persona(), it) },
-                    operacion = EscritorOperacion.nuevaOperacion(formulario),
+                    operacion = EscritorOperacion.nuevaOperacion(formulario).also { o ->
+                        if (verificacion != null) umbrales?.aplicar(o, verificacion, ahora)
+                    },
                     idUsuarioResponsable = cuenta.id,
                     beneficiarios = EscritorOperacion.beneficiarios(formulario)
                 )
             )
             historial.creacion(requireNotNull(registro.id) { "No se genero el ID del registro" }, autor, ahora)
+            if (verificacion != null) {
+                historial.anotar(requireNotNull(registro.id), com.security.modules.operaciones.domain.EventoOperacionEntity.UMBRAL,
+                    "Verificación de umbral", UmbralService.detalleEvento(verificacion), null, ahora)
+            }
             registro
         }
         return RegistroCreadoResponse(
@@ -80,7 +93,8 @@ class AltaOperacionService(
             fechaRegistro = guardado.fechaRegistro,
             creadoEn = ahora,
             estado = ESTADO_PENDIENTE,
-            responsable = UsuarioAsignableResponse(cuenta.id, responsable?.let { nombreCompleto(it) } ?: cuenta.usuario)
+            responsable = UsuarioAsignableResponse(cuenta.id, responsable?.let { nombreCompleto(it) } ?: cuenta.usuario),
+            umbral = verificacion
         )
     }
 }

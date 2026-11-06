@@ -30,7 +30,12 @@ data class Formulario(
  * para que un registro anterior al diseño nuevo (tipo de operacion escrito a mano, sin origen de fondos…) se pueda corregir
  * sin obligar a rehacer lo que no se toca.
  */
-class ValidadorOperacion(private val cat: Catalogos, private val anterior: Map<String, String?>? = null) {
+class ValidadorOperacion(
+    private val cat: Catalogos,
+    private val anterior: Map<String, String?>? = null,
+    // Oficinas configuradas por la empresa (RO 16): si hay, la oficina debe ser una de ellas
+    private val oficinas: List<String> = emptyList()
+) {
 
     private val errores = linkedMapOf<String, String>()
 
@@ -41,7 +46,10 @@ class ValidadorOperacion(private val cat: Catalogos, private val anterior: Map<S
         operacion: OperacionDto,
         beneficiarios: List<BeneficiarioDto>
     ): Formulario {
-        val ofi = texto("registro.oficina", oficina, 255, true, "Indica la oficina.")
+        val ofi = texto("registro.oficina", oficina, 255, true, "Indica la oficina.")?.let { o ->
+            if (oficinas.isEmpty() || igual("registro.oficina", o)) o
+            else oficinas.firstOrNull { it.equals(o, ignoreCase = true) } ?: o.also { error("registro.oficina", "Elige una oficina de la lista.") }
+        }
         val fisica = bloquePersona("personaFisica", personaFisica, representada = false)
         val representada = personaRepresentada?.let { bloquePersona("personaRepresentada", it, representada = true) }
         val (op, fecha, monto) = bloqueOperacion(operacion)

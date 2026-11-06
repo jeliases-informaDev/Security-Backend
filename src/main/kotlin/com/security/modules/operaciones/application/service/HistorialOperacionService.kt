@@ -87,7 +87,6 @@ class HistorialOperacionService(private val repository: HistorialOperacionReposi
         val todos = eventos(registro)
         val eventos = when (filtro) {
             TODO_ -> todos
-            ANALISIS -> emptyList() // entrega B
             else -> todos.filter { it.tipo == filtro }
         }
         val fechaOperacion = registro.operacion.fechaOperacion

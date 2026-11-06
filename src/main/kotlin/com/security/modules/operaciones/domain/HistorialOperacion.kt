@@ -65,6 +65,9 @@ class EventoOperacionEntity(
         const val EDICION = "EDICION"
         const val RESPONSABLE = "RESPONSABLE"
         const val DESCARGA = "DESCARGA"
+        const val ANALISIS = "ANALISIS"
+        const val UMBRAL = "UMBRAL"
+        const val ENVIO = "ENVIO"
         // Solo en la respuesta: registros que ya existian antes del historial (no se guarda)
         const val ANTERIOR = "ANTERIOR"
     }
@@ -141,8 +144,13 @@ class CatalogoOperacionEntity(
     @Column(name = "pide_texto", nullable = false)
     var pideTexto: Boolean = false,
 
+    // TIPO_OPERACION: grupo de tipos (sector). SECTOR: grupo de tipos de operacion y umbrales que usa (vacio = por configurar).
     @Column(name = "sector", length = 40)
     var sector: String? = null,
+
+    // Solo TIPO_OPERACION: tipo de bien que define el umbral (LOTE_TERRENO, UNIDAD_INMOBILIARIA)
+    @Column(name = "tipo_bien", length = 40)
+    var tipoBien: String? = null,
 
     @Column(name = "activo", nullable = false)
     var activo: Boolean = true

@@ -14,6 +14,14 @@ object CatalogosOperacion {
     const val MODALIDAD_PAGO = "MODALIDAD_PAGO"
     const val ORIGEN_FONDOS = "ORIGEN_FONDOS"
     const val TIPO_OPERACION = "TIPO_OPERACION"
+    const val SECTOR = "SECTOR"
+    const val SENAL_ALERTA = "SENAL_ALERTA"
+    const val FUENTE_SENAL = "FUENTE_SENAL"
+    const val FORMATO_EXPORTACION = "FORMATO_EXPORTACION"
+    const val NOTA_UMBRAL = "NOTA_UMBRAL"
+    // Unico formato con estructura (formato interno de PLAFT, no es una plantilla oficial de la SBS)
+    const val FORMATO_DISPOSICION = "DISPOSICION_UIF"
+    const val SENAL_OTRA = "OTRA"
 
     const val SIN_DOCUMENTO = "SIN_DOCUMENTO"
     const val DOCUMENTO_INICIAL = "DNI"
@@ -29,7 +37,8 @@ data class OpcionRegistro(
     val nombre: String,
     val orden: Int,
     val pideTexto: Boolean,
-    val sector: String?
+    val sector: String?,
+    val tipoBien: String? = null
 )
 
 /**
@@ -84,7 +93,7 @@ class CatalogosRegistro(
     @Transactional(readOnly = true)
     fun cargar(): Catalogos {
         val opciones = repository.findAllByActivoTrueOrderByCatalogoAscOrdenAsc().map {
-            OpcionRegistro(it.catalogo, it.codigo, it.nombre, it.orden, it.pideTexto, it.sector)
+            OpcionRegistro(it.catalogo, it.codigo, it.nombre, it.orden, it.pideTexto, it.sector, it.tipoBien)
         }
         // Cache por peticion: un mismo id viejo no se consulta dos veces.
         val nombres = mutableMapOf<Pair<CatalogoExportacion, Long>, String?>()

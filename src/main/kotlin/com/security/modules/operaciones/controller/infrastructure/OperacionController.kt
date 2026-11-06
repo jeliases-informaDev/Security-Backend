@@ -70,11 +70,15 @@ class OperacionController(
         @RequestParam(required = false) moneda: String? = null,
         @RequestParam(required = false) responsableId: Int? = null,
         @RequestParam(required = false) sinResponsable: Boolean? = null,
-        @RequestParam(required = false) estado: String? = null
+        @RequestParam(required = false) estado: List<String>? = null,
+        @RequestParam(required = false) oficina: String? = null,
+        @RequestParam(required = false) montoMinUsd: java.math.BigDecimal? = null,
+        @RequestParam(required = false) montoMaxUsd: java.math.BigDecimal? = null
     ): ListarOperacionesResponse =
         lista.listar(
             acceso.empresaPermitida(empresa),
-            ParametrosLista(q, desde, hasta, tipoOperacion, modalidadPago, moneda, responsableId, sinResponsable, estado),
+            ParametrosLista(q, desde, hasta, tipoOperacion, modalidadPago, moneda, responsableId, sinResponsable, null,
+                estado.orEmpty(), oficina, montoMinUsd, montoMaxUsd),
             page, size
         )
 

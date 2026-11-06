@@ -119,7 +119,7 @@ class ResponsableListaOperacionTest {
     @Test
     fun `filtros, periodo y paginas invalidos responden con su codigo`() {
         fun codigo(bloque: () -> Unit) = assertFailsWith<OperacionesException> { bloque() }.code
-        assertEquals(CodigosOperaciones.FILTRO_PRONTO, codigo { lista.listar("E", ParametrosLista(estado = "ENVIADO"), 0, 10) })
+        assertEquals(CodigosOperaciones.FILTRO_INVALIDO, codigo { lista.listar("E", ParametrosLista(estados = listOf("ENVIADO,ZZZ")), 0, 10) })
         assertEquals(CodigosOperaciones.FILTRO_INVALIDO, codigo { lista.listar("E", ParametrosLista(estado = "BORRADO"), 0, 10) })
         assertEquals(CodigosOperaciones.FILTRO_INVALIDO, codigo { lista.listar("E", ParametrosLista(tipoOperacion = "X"), 0, 10) })
         assertEquals(CodigosOperaciones.FILTRO_INVALIDO, codigo { lista.listar("E", ParametrosLista(moneda = "JPY"), 0, 10) })

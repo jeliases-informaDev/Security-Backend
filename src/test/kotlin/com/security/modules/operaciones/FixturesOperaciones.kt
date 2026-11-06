@@ -31,12 +31,9 @@ object FixturesOperaciones {
 
     /** Las opciones del archivo real del catalogo (el mismo que se siembra). */
     fun opciones(): List<OpcionRegistro> =
-        ClassPathResource("operaciones/catalogos-registro.csv").inputStream.bufferedReader(Charsets.UTF_8).useLines { lineas ->
-            lineas.drop(1).filter { it.isNotBlank() }.map { l ->
-                val c = l.split(";").map { it.trim() }
-                OpcionRegistro(c[0], c[1], c[2], c[3].toInt(), c[4].toBoolean(), c.getOrNull(5)?.takeIf { it.isNotEmpty() })
-            }.toList()
-        }
+        com.security.modules.operaciones.application.service.CatalogoOperacionesInicializador
+            .leerCatalogos("operaciones/catalogos-registro.csv")
+            .map { OpcionRegistro(it.catalogo, it.codigo, it.nombre, it.orden, it.pideTexto, it.sector, it.tipoBien) }
 
     fun catalogos(): Catalogos = Catalogos(opciones(), MONEDAS)
 

@@ -11,7 +11,14 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 /** Conteos de las tarjetas de RO 1. */
-data class ConteosOperaciones(val total: Long, val sinResponsable: Long, val delPeriodo: Long)
+data class ConteosOperaciones(
+    val total: Long,
+    val sinResponsable: Long,
+    val delPeriodo: Long,
+    val enviados: Long = 0,
+    val inusuales: Long = 0,
+    val sospechosas: Long = 0
+)
 
 /**
  * Lista e indicadores del Registro de Operaciones, resueltos en la base. Siempre filtra por la empresa del registro, que
@@ -27,6 +34,7 @@ class ListaOperacionesConsulta(private val em: EntityManager) {
         LEFT JOIN personas_operacion pf ON pf.id = r.id_persona_fisica
         LEFT JOIN personas_operacion pr ON pr.id = r.id_persona_representada
         LEFT JOIN usuarios ur ON ur.id = r.id_usuario_responsable
+        LEFT JOIN analisis_operaciones a ON a.registro_id = r.id
     """
 
     private val deLaEmpresa = "LOWER(TRIM(COALESCE(NULLIF(TRIM(u.empresa), ''), r.empresa))) = LOWER(TRIM(:empresa))"
@@ -47,7 +55,7 @@ class ListaOperacionesConsulta(private val em: EntityManager) {
                        r.oficina, r.fecha_registro, r.fecha_creacion, o.fecha_operacion, o.tipo_operacion, o.modalidad_pago,
                        o.monto, o.moneda, r.id_usuario_responsable,
                        NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(ur.nombres), ''), NULLIF(TRIM(ur.ape_pat), ''), NULLIF(TRIM(ur.ape_mat), ''))), ''),
-                       ur.usuario
+                       ur.usuario, a.estado, r.fecha_envio, o.monto_usd, o.umbral_estado
                 $desdeTablas
                 WHERE $where
                 ORDER BY r.fecha_registro DESC, r.fecha_creacion DESC, r.id DESC
@@ -74,7 +82,11 @@ class ListaOperacionesConsulta(private val em: EntityManager) {
                     monto = decimal(c[10]),
                     moneda = c[11]?.toString(),
                     responsableId = (c[12] as Number?)?.toInt(),
-                    responsableNombre = (c[13] ?: c[14])?.toString()
+                    responsableNombre = (c[13] ?: c[14])?.toString(),
+                    estadoAnalisis = c[15]?.toString(),
+                    fechaEnvio = fecha(c[16]),
+                    montoUsd = decimal(c[17]),
+                    umbralEstado = c[18]?.toString()
                 )
             }
         return filas to total
@@ -86,7 +98,10 @@ class ListaOperacionesConsulta(private val em: EntityManager) {
             """
             SELECT COUNT(*),
                    COALESCE(SUM(CASE WHEN r.id_usuario_responsable IS NULL THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(CASE WHEN r.fecha_registro BETWEEN :desde AND :hasta THEN 1 ELSE 0 END), 0)
+                   COALESCE(SUM(CASE WHEN r.fecha_registro BETWEEN :desde AND :hasta THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN r.fecha_envio IS NOT NULL THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN a.estado IN ('EN_ANALISIS', 'SOSPECHOSA') THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN a.estado = 'SOSPECHOSA' THEN 1 ELSE 0 END), 0)
             $desdeTablas
             WHERE $deLaEmpresa
             """
@@ -95,8 +110,26 @@ class ListaOperacionesConsulta(private val em: EntityManager) {
             .setParameter("desde", desde)
             .setParameter("hasta", hasta)
             .singleResult as Array<*>
-        return ConteosOperaciones((c[0] as Number).toLong(), (c[1] as Number).toLong(), (c[2] as Number).toLong())
+        fun n(i: Int) = (c[i] as Number).toLong()
+        return ConteosOperaciones(n(0), n(1), n(2), n(3), n(4), n(5))
     }
+
+    /** Registros de la empresa cuya fecha de operacion cae en [desde, hasta]: id y fecha de envio (null = pendiente). */
+    @Transactional(readOnly = true)
+    fun delPeriodo(empresa: String, desde: LocalDate, hasta: LocalDate): List<Pair<Long, LocalDate?>> =
+        em.createNativeQuery(
+            """
+            SELECT r.id, r.fecha_envio
+            $desdeTablas
+            WHERE $deLaEmpresa AND o.fecha_operacion BETWEEN :desde AND :hasta
+            ORDER BY o.fecha_operacion, r.id
+            """
+        )
+            .setParameter("empresa", empresa)
+            .setParameter("desde", desde)
+            .setParameter("hasta", hasta)
+            .resultList
+            .map { fila -> val c = fila as Array<*>; (c[0] as Number).toLong() to fecha(c[1]) }
 
     private fun condiciones(f: FiltrosOperaciones): Pair<List<String>, Map<String, Any>> {
         val cond = mutableListOf<String>()
@@ -129,6 +162,20 @@ class ListaOperacionesConsulta(private val em: EntityManager) {
             f.monedaId?.let { partes.add("TRIM(o.moneda) = :monedaId"); par["monedaId"] = it.toString() }
             cond.add(partes.joinToString(" OR ", "(", ")"))
         }
+        if (f.estados.isNotEmpty()) {
+            val partes = f.estados.mapNotNull {
+                when (it) {
+                    "PENDIENTE" -> "r.fecha_envio IS NULL"
+                    "ENVIADO" -> "r.fecha_envio IS NOT NULL"
+                    "INUSUAL" -> "a.estado IN ('EN_ANALISIS', 'SOSPECHOSA')"
+                    else -> null
+                }
+            }
+            if (partes.isNotEmpty()) cond.add(partes.joinToString(" OR ", "(", ")"))
+        }
+        f.oficina?.let { cond.add("LOWER(TRIM(r.oficina)) = LOWER(TRIM(:oficina))"); par["oficina"] = it }
+        f.montoMinUsd?.let { cond.add("o.monto_usd >= :montoMin"); par["montoMin"] = it }
+        f.montoMaxUsd?.let { cond.add("o.monto_usd <= :montoMax"); par["montoMax"] = it }
         if (f.sinResponsable) cond.add("r.id_usuario_responsable IS NULL")
         else f.responsableId?.let { cond.add("r.id_usuario_responsable = :responsable"); par["responsable"] = it }
         return cond to par

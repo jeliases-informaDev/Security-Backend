@@ -26,7 +26,10 @@ class EdicionOperacionService(
     private val repository: OperacionRepository,
     private val catalogos: CatalogosRegistro,
     private val historial: HistorialOperacionService,
-    private val em: EntityManager
+    private val em: EntityManager,
+    private val acceso: AccesoEmpresaService? = null,
+    private val umbrales: UmbralService? = null,
+    private val configuracion: ConfiguracionOperacionesService? = null
 ) {
 
     @Transactional
@@ -39,7 +42,9 @@ class EdicionOperacionService(
         val registro = repository.findById(id).orElse(null) ?: throw CodigosOperaciones.noEncontrada(id)
         val cat = catalogos.cargar()
         val antes = FotoOperacion.campos(registro, cat)
-        val f = ValidadorOperacion(cat, FotoOperacion.valores(antes)).validar(
+        val empresa = acceso?.empresaDelRegistro(registro) ?: registro.empresa
+        val oficinas = configuracion?.de(empresa, cat)?.oficinas.orEmpty()
+        val f = ValidadorOperacion(cat, FotoOperacion.valores(antes), oficinas).validar(
             request.registro.oficina, request.personaFisica, request.personaRepresentada, request.operacion, request.beneficiarios
         )
 
@@ -72,7 +77,17 @@ class EdicionOperacionService(
             em.remove(representadaAnterior)
             repository.flush()
         }
-        historial.edicion(id, autor, LocalDateTime.now(ZONA_LIMA).withNano(0), motivo, cambios)
+        val ahora = LocalDateTime.now(ZONA_LIMA).withNano(0)
+        historial.edicion(id, autor, ahora, motivo, cambios)
+        // Se vuelve a verificar el umbral; solo se anota si cambio el resultado guardado
+        umbrales?.let { u ->
+            val v = u.evaluar(empresa, f.operacion.tipoOperacion, f.operacion.moneda, f.monto, f.fechaOperacion, cat)
+            if (u.aplicar(registro.operacion, v, ahora)) {
+                repository.flush()
+                historial.anotar(id, com.security.modules.operaciones.domain.EventoOperacionEntity.UMBRAL,
+                    "Verificación de umbral", UmbralService.detalleEvento(v), null, ahora)
+            }
+        }
         return EdicionOperacionResponse(
             id = id,
             numeroRegistro = registro.numeroRegistro.orEmpty(),

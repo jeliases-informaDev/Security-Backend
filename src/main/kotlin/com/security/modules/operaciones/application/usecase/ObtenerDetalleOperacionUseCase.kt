@@ -20,7 +20,11 @@ class ObtenerDetalleOperacionUseCase(
     private val consulta: OperacionConsultaPort,
     private val operacionRepository: OperacionRepository? = null,
     private val historial: HistorialOperacionService? = null,
-    private val usuarioRepository: UsuarioRepository? = null
+    private val usuarioRepository: UsuarioRepository? = null,
+    private val analisis: com.security.modules.operaciones.application.service.AnalisisOperacionService? = null,
+    private val umbrales: com.security.modules.operaciones.application.service.UmbralService? = null,
+    private val catalogos: com.security.modules.operaciones.application.service.CatalogosRegistro? = null,
+    private val exportaciones: com.security.modules.operaciones.infraestructure.ExportacionOperacionesRepository? = null
 ) {
     @Transactional(readOnly = true)
     fun ejecutar(id: Long): DetalleOperacionResponse {
@@ -31,6 +35,13 @@ class ObtenerDetalleOperacionUseCase(
             val u = usuarioRepository?.findById(rid)?.orElse(null)
             UsuarioAsignableResponse(rid, u?.let { nombreCompleto(it) } ?: rid.toString())
         }
+        val cat = catalogos?.cargar()
+        val inusualidad = if (registro != null && cat != null) analisis?.resumen(id, cat) else null
+        val envio = registro?.idExportacionEnvio?.let { exportId ->
+            val fecha = registro?.fechaEnvio ?: return@let null
+            com.security.modules.operaciones.dto.EnvioResumen(exportId, fecha,
+                exportaciones?.findById(exportId)?.orElse(null)?.numeroAcuse)
+        }
         return DetalleOperacionResponse(
             id = datos.id,
             numeroRegistro = datos.codigoOperacion,
@@ -39,10 +50,14 @@ class ObtenerDetalleOperacionUseCase(
             personaRepresentada = datos.personaRepresentada,
             operacion = datos.operacion,
             beneficiarios = datos.beneficiarios,
-            estado = ESTADO_PENDIENTE,
+            estado = com.security.modules.operaciones.application.service.estadoRegistro(inusualidad?.estado, registro?.fechaEnvio),
             responsable = responsable,
             conservarHasta = datos.operacion.fechaOperacion.plusYears(5),
-            historialReciente = registro?.let { historial?.eventos(it)?.take(2) }.orEmpty()
+            historialReciente = registro?.let { historial?.eventos(it)?.take(2) }.orEmpty(),
+            estadoEnvio = if (registro?.fechaEnvio != null) "ENVIADO" else ESTADO_PENDIENTE,
+            umbral = if (registro != null && cat != null) umbrales?.guardada(registro.operacion, cat) else null,
+            inusualidad = inusualidad,
+            envio = envio
         )
     }
 }

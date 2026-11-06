@@ -4,7 +4,10 @@ import com.security.modules.denuncias.domain.enums.CausaDenuncia
 import com.security.modules.denuncias.domain.enums.EstadoDenuncia
 import com.security.modules.denuncias.domain.enums.RelacionEmpresa
 import com.security.shared.datos.entities.Usuario
+import com.security.modules.denuncias.domain.enums.ResultadoCierreDenuncia
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 
 @Entity
@@ -19,7 +22,9 @@ class DenunciaEntity(
     // DATOS DE LA DENUNCIA
     // -------------------------
 
+    // Texto y no ENUM de MySQL: asi agregar una situacion no exige cambiar la columna (ver EsquemaDenunciasInicializador).
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(
         name = "causa",
         nullable = false,
@@ -168,5 +173,34 @@ class DenunciaEntity(
     var fechaActualizacion: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "fecha_cierre")
-    var fechaCierre: LocalDateTime? = null
+    var fechaCierre: LocalDateTime? = null,
+
+    // -------------------------
+    // RESULTADO DEL CIERRE (docs/DENUNCIAS-CIERRE.md); null en las cerradas antes de existir
+    // -------------------------
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "resultado_cierre", length = 20)
+    var resultadoCierre: ResultadoCierreDenuncia? = null,
+
+    @Column(name = "motivo_cierre", length = 1000)
+    var motivoCierre: String? = null,
+
+    // -------------------------
+    // DERIVACION AL OFICIAL DE CUMPLIMIENTO (reservada)
+    // -------------------------
+
+    @Column(name = "derivada_al_oficial", nullable = false)
+    var derivadaAlOficial: Boolean = false,
+
+    @Column(name = "fecha_derivacion")
+    var fechaDerivacion: LocalDateTime? = null,
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "derivada_por_usuario_id")
+    var derivadaPorUsuario: Usuario? = null,
+
+    @Column(name = "motivo_derivacion", length = 500)
+    var motivoDerivacion: String? = null
 )

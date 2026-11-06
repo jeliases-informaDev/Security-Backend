@@ -3,6 +3,8 @@ package com.security.modules.denuncias.application.usecase
 import com.security.modules.denuncias.application.dto.ActualizarEstadoDenunciaRequest
 import com.security.modules.denuncias.application.dto.DenunciaDetalleResponse
 import com.security.modules.denuncias.application.service.AutorizacionDenunciaService
+import com.security.modules.denuncias.application.service.CodigosDenuncia
+import com.security.modules.denuncias.application.service.DenunciaException
 import com.security.modules.denuncias.domain.enums.EstadoDenuncia
 import com.security.modules.denuncias.infrastructure.persistence.entity.DenunciaHistorialEntity
 import com.security.modules.denuncias.infrastructure.persistence.repository.DenunciaHistorialRepository
@@ -119,6 +121,32 @@ class ActualizarEstadoDenunciaUseCase(
 
 
         // =====================================================
+        // RESULTADO DEL CIERRE (docs/DENUNCIAS-CIERRE.md)
+        // =====================================================
+
+        val motivo = request.motivoCierre?.trim()?.takeIf { it.isNotEmpty() }
+        if (nuevoEstado != EstadoDenuncia.CERRADO && (request.resultadoCierre != null || motivo != null)) {
+            throw DenunciaException(HttpStatus.BAD_REQUEST, CodigosDenuncia.RESULTADO_SOLO_AL_CERRAR,
+                "El resultado y el motivo del cierre solo se indican al cerrar la denuncia.")
+        }
+        if (nuevoEstado == EstadoDenuncia.CERRADO) {
+            val resultado = request.resultadoCierre
+                ?: throw DenunciaException(HttpStatus.BAD_REQUEST, CodigosDenuncia.RESULTADO_OBLIGATORIO,
+                    "Para cerrar la denuncia indica el resultado: Fundada, Infundada o Archivada.")
+            if (resultado.pideMotivo && motivo == null) {
+                throw DenunciaException(HttpStatus.BAD_REQUEST, CodigosDenuncia.MOTIVO_OBLIGATORIO,
+                    "Para archivar la denuncia escribe el motivo.")
+            }
+            if (motivo != null && motivo.length > 1000) {
+                throw DenunciaException(HttpStatus.BAD_REQUEST, CodigosDenuncia.MOTIVO_LARGO,
+                    "El motivo del cierre puede tener hasta 1000 caracteres.")
+            }
+            denuncia.resultadoCierre = resultado
+            denuncia.motivoCierre = motivo
+        }
+
+
+        // =====================================================
         // ACTUALIZAR
         // =====================================================
 
@@ -166,11 +194,11 @@ class ActualizarEstadoDenunciaUseCase(
                     nuevoEstado,
 
                 comentario =
-                    request.comentario
-                        ?.trim()
-                        ?.takeIf {
-                            it.isNotBlank()
-                        },
+                    listOfNotNull(
+                        request.comentario?.trim()?.takeIf { it.isNotBlank() },
+                        denuncia.resultadoCierre?.takeIf { nuevoEstado == EstadoDenuncia.CERRADO }
+                            ?.let { "Resultado del cierre: ${it.etiqueta}" + (denuncia.motivoCierre?.let { m -> ". Motivo: $m" } ?: "") }
+                    ).joinToString(" · ").takeIf { it.isNotBlank() },
 
                 usuario =
                     usuarioResponsable,

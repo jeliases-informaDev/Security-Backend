@@ -46,7 +46,8 @@ class InicioService(
     private val reglasOficial: ReglasOficialService,
     private val demo: DemoInicioService,
     private val reloj: RelojInicio,
-    private val plazoDenuncias: PlazoDenunciasService
+    private val plazoDenuncias: PlazoDenunciasService,
+    private val cabinaService: CabinaService
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -81,8 +82,39 @@ class InicioService(
             listas = bloque("listas") { listas(usuario, roles, empresa, periodo) },
             operaciones = bloque("operaciones") { operaciones(roles, empresa, periodo) },
             oficial = bloque("oficial") { oficial() },
-            denuncias = bloque("denuncias") { denuncias(usuario, roles, empresa, periodo) }
+            denuncias = bloque("denuncias") { denuncias(usuario, roles, empresa, periodo) },
+            cabina = bloque("cabina") { cabina(usuario, roles, empresa, periodo) }
         )
+    }
+
+    /**
+     * Cabina de mando: solo para quien mira toda la empresa (administrador universal o de empresa). Cada instrumento usa
+     * el alcance de su modulo; la licencia la ven el universal y el titular (administrador de empresa).
+     */
+    private fun cabina(usuario: Usuario, roles: Set<String>, empresa: String?, periodo: YearMonth): CabinaInicio? {
+        val universal = ROL_ADMINISTRADOR in roles
+        if (!universal && !(ROL_ADMINISTRADOR_EMPRESA in roles && empresa != null)) return null
+        val alcance = alcanceListas(usuario, roles, empresa)
+        return cabinaService.cabina(
+            AlcancesCabina(
+                listas = alcance, scoring = alcance, empresaOperaciones = empresa,
+                denuncias = alcanceDenuncias(usuario, roles, empresa), empresaLicencia = empresa, veLicencia = true
+            ),
+            periodo, finSerie(periodo)
+        )
+    }
+
+    private fun alcanceListas(usuario: Usuario, roles: Set<String>, empresa: String?): AlcanceInicio = when {
+        empresa != null && (ROL_ADMINISTRADOR in roles || ROL_ADMINISTRADOR_EMPRESA in roles) -> AlcanceInicio(false, empresa, null)
+        empresa == null && ROL_ADMINISTRADOR in roles -> AlcanceInicio(true, null, null)
+        else -> AlcanceInicio(false, null, usuario.id)
+    }
+
+    private fun alcanceDenuncias(usuario: Usuario, roles: Set<String>, empresa: String?): AlcanceInicio? = when {
+        ROL_ADMINISTRADOR in roles -> if (empresa != null) AlcanceInicio(false, empresa, null) else AlcanceInicio(true, null, null)
+        ROL_ADMINISTRADOR_EMPRESA in roles && empresa != null -> AlcanceInicio(false, empresa, null)
+        "SUPERVISOR" in roles && usuario.id != null -> AlcanceInicio(false, null, usuario.id)
+        else -> null
     }
 
     // Un bloque que falla no tumba la pagina principal: se registra y ese bloque va null.
@@ -108,11 +140,7 @@ class InicioService(
 
     private fun listas(usuario: Usuario, roles: Set<String>, empresa: String?, periodo: YearMonth): ListasInicio {
         // Siempre dentro de la empresa de la cuenta. Sin empresa: el universal ve todo; las demas cuentas, lo propio.
-        val a = when {
-            empresa != null && (ROL_ADMINISTRADOR in roles || ROL_ADMINISTRADOR_EMPRESA in roles) -> AlcanceInicio(false, empresa, null)
-            empresa == null && ROL_ADMINISTRADOR in roles -> AlcanceInicio(true, null, null)
-            else -> AlcanceInicio(false, null, usuario.id)
-        }
+        val a = alcanceListas(usuario, roles, empresa)
         val desde = periodo.atDay(1).atStartOfDay()
         val hasta = periodo.plusMonths(1).atDay(1).atStartOfDay()
         val grupos = consultas.gruposConsultas(a, desde, hasta)
@@ -250,12 +278,7 @@ class InicioService(
     private fun denuncias(usuario: Usuario, roles: Set<String>, empresa: String?, periodo: YearMonth): DenunciasInicio? {
         // Misma regla que AutorizacionDenunciaService: universal y administrador de empresa, su empresa; supervisor, lo
         // asignado a el; las demas cuentas no gestionan denuncias (bloque null).
-        val a = when {
-            ROL_ADMINISTRADOR in roles -> if (empresa != null) AlcanceInicio(false, empresa, null) else AlcanceInicio(true, null, null)
-            ROL_ADMINISTRADOR_EMPRESA in roles && empresa != null -> AlcanceInicio(false, empresa, null)
-            "SUPERVISOR" in roles && usuario.id != null -> AlcanceInicio(false, null, usuario.id)
-            else -> return null
-        }
+        val a = alcanceDenuncias(usuario, roles, empresa) ?: return null
         val desde = periodo.atDay(1).atStartOfDay()
         val hasta = periodo.plusMonths(1).atDay(1).atStartOfDay()
         val plazoDenunciasDias = plazoDenuncias.dias

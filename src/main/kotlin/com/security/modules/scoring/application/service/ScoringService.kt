@@ -216,6 +216,18 @@ class ScoringService(
     @Transactional
     fun evaluar(username: String, request: DatosScoringRequest): ResultadoScoringResponse {
         val usuario = usuarioRepository.findByUsuario(username) ?: throw ResourceNotFoundException("Usuario no encontrado")
+        return registrar(usuario, request, LocalDateTime.now().withNano(0), cobrar = true)
+    }
+
+    /**
+     * Solo para los datos de demostracion del Inicio (DemoInicioService): el mismo calculo y el mismo guardado que
+     * evaluar, con la fecha indicada y SIN consumir tokens (no es una evaluacion real de la empresa).
+     */
+    @Transactional
+    fun evaluarDemostracion(usuario: Usuario, request: DatosScoringRequest, fecha: LocalDateTime): ResultadoScoringResponse =
+        registrar(usuario, request, fecha.withNano(0), cobrar = false)
+
+    private fun registrar(usuario: Usuario, request: DatosScoringRequest, fecha: LocalDateTime, cobrar: Boolean): ResultadoScoringResponse {
         val p = preparar(usuario, request)
         val calculo = p.calculo
         val nivel = calculo.nivel
@@ -232,12 +244,12 @@ class ScoringService(
         }
         val sustentoId = request.sustentoId?.trim()?.takeIf { it.isNotEmpty() }?.also { validarSustento(usuario, it) }
 
-        val fecha = LocalDateTime.now().withNano(0)
         val resultado = construirResultado(p, id = 0, fecha = fecha, sustentoId = sustentoId)
 
         // El token se pide recien aqui, con todo resuelto: datos incompletos o un sustento ajeno no consumen.
         val entidad = p.entidad
-        val claveConsumo = consumirScoring(if (entidad != null) "scoring de la entidad ${entidad.id}" else "scoring de un cliente nuevo")
+        val claveConsumo = if (!cobrar) null
+            else consumirScoring(if (entidad != null) "scoring de la entidad ${entidad.id}" else "scoring de un cliente nuevo")
 
         // Si el guardado falla despues de consumir, se devuelve el token.
         val guardado = try {

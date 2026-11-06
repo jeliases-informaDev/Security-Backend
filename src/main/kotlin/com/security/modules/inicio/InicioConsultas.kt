@@ -27,6 +27,8 @@ data class FilaUltimoRegistro(
     val estadoAnalisis: String?, val fechaEnvio: Any?
 )
 
+data class UbicacionRegistros(val departamento: String?, val provincia: String?, val registros: Long, val montoUsd: BigDecimal)
+
 data class AbiertasDenuncias(val porAtender: Long, val sinAbrir: Long, val vencidas: Long)
 
 /**
@@ -221,6 +223,124 @@ class InicioConsultas(private val em: EntityManager) {
         (alcanceDenuncias(
             em.createQuery("SELECT COUNT(d) $baseDenuncias AND d.derivadaAlOficial = true AND d.fechaDerivacion >= :desde AND d.fechaDerivacion < :hasta"), a
         ).setParameter("desde", desde).setParameter("hasta", hasta).singleResult as Number).toLong()
+
+    // ------------------------------------------------------------------ Cabina: scoring (solo version 2)
+
+    // Visibilidad del scoring: la empresa ACTUAL de la cuenta que evaluo (scoring_riesgo no guarda empresa), como el historial.
+    private val baseScoring = """
+        FROM ScoringRiesgo s JOIN s.usuario u
+        WHERE s.version = 2
+          AND (:todo = true OR (:empresa IS NOT NULL AND LOWER(TRIM(u.empresa)) = LOWER(TRIM(:empresa))) OR u.id = :usuarioId)
+          AND s.fechaCreacion >= :desde AND s.fechaCreacion < :hasta
+    """
+
+    private fun alcanceScoring(q: Query, a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): Query =
+        q.setParameter("todo", a.todo).setParameter("empresa", a.empresa).setParameter("usuarioId", a.usuarioId)
+            .setParameter("desde", desde).setParameter("hasta", hasta)
+
+    /** [nivel, cantidad, suma de puntajes] del periodo. */
+    @Transactional(readOnly = true)
+    fun scoringPorNivel(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): List<Triple<String?, Long, BigDecimal>> =
+        alcanceScoring(em.createQuery("SELECT s.nivel, COUNT(s), SUM(s.puntaje) $baseScoring GROUP BY s.nivel"), a, desde, hasta)
+            .resultList.map {
+                val r = it as Array<*>
+                Triple(r[0] as String?, n(r[1]), decimal(r[2]) ?: BigDecimal.ZERO)
+            }
+
+    /** El resultado completo (JSON) de cada evaluacion del periodo: de ahi salen los 8 factores del radar. */
+    @Transactional(readOnly = true)
+    fun scoringResultados(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): List<String> =
+        alcanceScoring(em.createQuery("SELECT s.resultado $baseScoring AND s.resultado IS NOT NULL"), a, desde, hasta)
+            .resultList.mapNotNull { it as String? }
+
+    @Transactional(readOnly = true)
+    fun scoringPorDia(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): Map<LocalDate, Long> =
+        alcanceScoring(
+            em.createQuery("SELECT CAST(s.fechaCreacion AS LocalDate), COUNT(s) $baseScoring GROUP BY CAST(s.fechaCreacion AS LocalDate)"),
+            a, desde, hasta
+        ).resultList.associate { val r = it as Array<*>; fecha(r[0])!! to n(r[1]) }
+
+    /** [departamento de residencia, evaluaciones, altas] del periodo. */
+    @Transactional(readOnly = true)
+    fun scoringPorDepartamento(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): List<Triple<String, Long, Long>> =
+        alcanceScoring(
+            em.createQuery(
+                "SELECT s.departamento.nombre, COUNT(s), SUM(CASE WHEN s.nivel = 'ALTO' THEN 1 ELSE 0 END) $baseScoring GROUP BY s.departamento.nombre"
+            ), a, desde, hasta
+        ).resultList.map { val r = it as Array<*>; Triple(r[0].toString(), n(r[1]), n(r[2])) }
+
+    // ------------------------------------------------------------------ Cabina: registros, denuncias y catalogos
+
+    @Transactional(readOnly = true)
+    fun registrosPorDia(empresa: String, desde: LocalDate, hasta: LocalDate): Map<LocalDate, Long> =
+        em.createNativeQuery(
+            "SELECT r.fecha_registro, COUNT(*) $desdeRegistros WHERE $deLaEmpresa AND r.fecha_registro BETWEEN :desde AND :hasta GROUP BY r.fecha_registro"
+        ).setParameter("empresa", empresa).setParameter("desde", desde).setParameter("hasta", hasta).resultList
+            .associate { val r = it as Array<*>; fecha(r[0])!! to n(r[1]) }
+
+    /** [departamento, provincia, registros, monto en US$] del periodo, tal como estan en la persona que realiza. */
+    @Transactional(readOnly = true)
+    fun registrosPorUbicacion(empresa: String, desde: LocalDate, hasta: LocalDate): List<UbicacionRegistros> =
+        em.createNativeQuery(
+            """
+            SELECT pf.departamento, pf.provincia, COUNT(*),
+                   COALESCE(SUM(COALESCE(o.monto_usd, CASE WHEN UPPER(TRIM(o.moneda)) = 'USD' THEN o.monto END)), 0)
+            $desdeRegistros
+            LEFT JOIN personas_operacion pf ON pf.id = r.id_persona_fisica
+            WHERE $deLaEmpresa AND r.fecha_registro BETWEEN :desde AND :hasta
+            GROUP BY pf.departamento, pf.provincia
+            """
+        ).setParameter("empresa", empresa).setParameter("desde", desde).setParameter("hasta", hasta).resultList.map {
+            val r = it as Array<*>
+            UbicacionRegistros(r[0]?.toString(), r[1]?.toString(), n(r[2]), decimal(r[3]) ?: BigDecimal.ZERO)
+        }
+
+    /** Registros con fecha de operacion en [desde, hasta] aun sin constancia de envio. */
+    @Transactional(readOnly = true)
+    fun pendientesDeEnvio(empresa: String, desde: LocalDate, hasta: LocalDate): Long =
+        n(
+            em.createNativeQuery(
+                "SELECT COUNT(*) $desdeRegistros WHERE $deLaEmpresa AND o.fecha_operacion BETWEEN :desde AND :hasta AND r.fecha_envio IS NULL"
+            ).setParameter("empresa", empresa).setParameter("desde", desde).setParameter("hasta", hasta).singleResult
+        )
+
+    /** Provincias del catalogo con su departamento: [id, provincia, departamento]. */
+    @Transactional(readOnly = true)
+    fun provincias(): List<Triple<Int, String, String>> =
+        em.createQuery("SELECT p.id, p.nombre, d.nombre FROM Provincia p JOIN p.departamento d").resultList.map {
+            val r = it as Array<*>
+            Triple((r[0] as Number).toInt(), r[1].toString(), r[2].toString())
+        }
+
+    @Transactional(readOnly = true)
+    fun departamentos(): Map<Int, String> =
+        em.createQuery("SELECT d.id, d.nombre FROM ScoringDepartamento d").resultList
+            .associate { val r = it as Array<*>; (r[0] as Number).toInt() to r[1].toString() }
+
+    @Transactional(readOnly = true)
+    fun denunciasPorDia(a: AlcanceInicio, desde: LocalDateTime, hasta: LocalDateTime): Map<LocalDate, Long> =
+        alcanceDenuncias(
+            em.createQuery(
+                "SELECT CAST(d.fechaCreacion AS LocalDate), COUNT(d) $baseDenuncias AND d.fechaCreacion >= :desde AND d.fechaCreacion < :hasta GROUP BY CAST(d.fechaCreacion AS LocalDate)"
+            ), a
+        ).setParameter("desde", desde).setParameter("hasta", hasta).resultList
+            .associate { val r = it as Array<*>; fecha(r[0])!! to n(r[1]) }
+
+    /** Las abiertas mas antiguas (las primeras en vencer): [id, codigo de seguimiento, creacion]. Nada del denunciante. */
+    @Transactional(readOnly = true)
+    fun denunciasAbiertasMasAntiguas(a: AlcanceInicio, cuantas: Int): List<Triple<Int, String?, LocalDateTime>> =
+        alcanceDenuncias(
+            em.createQuery(
+                """
+                SELECT d.id, d.codigoSeguimiento, d.fechaCreacion $baseDenuncias
+                AND d.estado <> com.security.modules.denuncias.domain.enums.EstadoDenuncia.CERRADO
+                ORDER BY d.fechaCreacion ASC, d.id ASC
+                """
+            ), a
+        ).setMaxResults(cuantas).resultList.map {
+            val r = it as Array<*>
+            Triple((r[0] as Number).toInt(), r[1] as String?, r[2] as LocalDateTime)
+        }
 
     // ------------------------------------------------------------------ piezas
 

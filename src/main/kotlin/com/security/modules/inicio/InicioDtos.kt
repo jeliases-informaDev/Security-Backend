@@ -36,7 +36,9 @@ data class ResumenInicioResponse(
     val listas: ListasInicio?,
     val operaciones: OperacionesInicio?,
     val oficial: OficialInicio?,
-    val denuncias: DenunciasInicio?
+    val denuncias: DenunciasInicio?,
+    // CONTRATO-CABINA.md, PARTE B: null si la cuenta no mira toda la empresa
+    val cabina: CabinaInicio? = null
 )
 
 data class DemoEstado(val cargado: Boolean, val puedeGestionar: Boolean)

@@ -38,6 +38,8 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.util.UUID
 import kotlin.test.assertTrue
+import kotlin.test.assertEquals
+import com.jayway.jsonpath.JsonPath
 
 /**
  * Tablero de Inicio de punta a punta contra la MySQL del CI (rutas, token y filtro de seguridad reales). Cada prueba crea
@@ -117,6 +119,8 @@ class InicioIntegracionTest {
     private fun delete(url: String, t: String): ResultActions =
         mvc.perform(MockMvcRequestBuilders.delete(url).header("Authorization", "Bearer $t"))
 
+    private fun cuerpo(r: ResultActions) = r.andReturn().response.getContentAsString(StandardCharsets.UTF_8)
+
     /** Un dato real de la empresa (no lleva marca de demostracion): debe sobrevivir a «Quitar». */
     private fun datosReales(u: Usuario, empresa: String) {
         consultas.save(
@@ -149,6 +153,17 @@ class InicioIntegracionTest {
             .andExpect(jsonPath("$.oficial.estado").value("SIN_OFICIAL"))
             .andExpect(jsonPath("$.denuncias.recibidas").value(0))
             .andExpect(jsonPath("$.denuncias.plazosATiempoPct").value(nullValue()))
+            // Cabina sin datos: todo vacio, sin error
+            .andExpect(jsonPath("$.cabina.scoring.evaluaciones").value(0))
+            .andExpect(jsonPath("$.cabina.scoring.puntajePromedio").value(nullValue()))
+            .andExpect(jsonPath("$.cabina.scoring.radar.length()").value(0))
+            .andExpect(jsonPath("$.cabina.scoring.escala.corteMedio").value(1.75))
+            .andExpect(jsonPath("$.cabina.scoring.escala.corteAlto").value(2.5))
+            .andExpect(jsonPath("$.cabina.tendencia.consultas.length()").value(30))
+            .andExpect(jsonPath("$.cabina.tendencia.desde").value("2026-10-08"))
+            .andExpect(jsonPath("$.cabina.mapa.departamentos.length()").value(0))
+            .andExpect(jsonPath("$.cabina.plazos.length()").value(0))
+            .andExpect(jsonPath("$.cabina.licencia").value(nullValue()))
     }
 
     @Test
@@ -224,6 +239,28 @@ class InicioIntegracionTest {
             .andExpect(jsonPath("$.denuncias.cierres.archivadaPct").value(27.0))
             .andExpect(jsonPath("$.denuncias.derivadasAlOficial").value(2))
 
+        // Cabina con la demostracion: todos los instrumentos llenos.
+        val conDemo = cuerpo(get("/api/inicio/resumen", t).andExpect(status().isOk))
+        println("CABINA DEMO: " + JsonPath.read<Any>(conDemo, "$.cabina").toString().take(3000))
+        assertEquals(8, JsonPath.read<List<Any>>(conDemo, "$.cabina.scoring.radar").size)
+        val evaluaciones = JsonPath.read<Number>(conDemo, "$.cabina.scoring.evaluaciones").toLong()
+        assertTrue(evaluaciones > 0)
+        val niveles = listOf("bajo", "medio", "alto").sumOf { JsonPath.read<Number>(conDemo, "$.cabina.scoring.porNivel.$it").toLong() }
+        assertEquals(evaluaciones, niveles)
+        assertTrue(JsonPath.read<Number>(conDemo, "$.cabina.scoring.porNivel.alto").toLong() > 0)
+        listOf("consultas", "coincidencias", "registros", "evaluaciones", "denuncias").forEach { serie ->
+            val valores = JsonPath.read<List<Number>>(conDemo, "$.cabina.tendencia.$serie")
+            assertEquals(30, valores.size, serie)
+            assertTrue(valores.any { it.toLong() > 0 }, serie)
+        }
+        val codigos = JsonPath.read<List<String?>>(conDemo, "$.cabina.mapa.departamentos[*].codigo")
+        assertTrue(codigos.size >= 8, "departamentos: $codigos")
+        assertTrue(codigos.all { it != null && Regex("(0[1-9]|1[0-9]|2[0-5])").matches(it) }, "codigos: $codigos")
+        val dias = JsonPath.read<List<Number>>(conDemo, "$.cabina.plazos[*].dias").map { it.toLong() }
+        assertTrue(dias.isNotEmpty() && dias.size <= 6)
+        assertEquals(dias.sorted(), dias)
+        assertTrue(JsonPath.read<List<String>>(conDemo, "$.cabina.plazos[*].tipo").contains("DENUNCIA"))
+
         // Otra empresa no ve nada de esto.
         val (_, otra) = cuenta(empresa(), "ADMINISTRADOR")
         get("/api/inicio/resumen", otra)
@@ -267,11 +304,13 @@ class InicioIntegracionTest {
         get("/api/inicio/resumen", adminEmpresa)
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.demo.puedeGestionar").value(false))
+            .andExpect(jsonPath("$.cabina.scoring").exists())
             .andExpect(jsonPath("$.denuncias.recibidas").value(0))
         // Una cuenta comun no gestiona denuncias: ese bloque no viene.
         get("/api/inicio/resumen", usuario)
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.denuncias").value(nullValue()))
+            .andExpect(jsonPath("$.cabina").value(nullValue()))
             .andExpect(jsonPath("$.listas.consultas").value(0))
         get("/api/inicio/resumen?periodo=2026-13", usuario)
             .andExpect(status().isBadRequest)

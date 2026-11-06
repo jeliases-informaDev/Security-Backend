@@ -33,6 +33,15 @@ import com.security.shared.datos.repositories.EmpresaRepository
 import com.security.shared.datos.repositories.UsuarioRepository
 import com.security.shared.security.ROL_ADMINISTRADOR
 import com.security.shared.security.limpiarEmpresa
+import com.security.modules.scoring.application.service.ScoringService
+import com.security.modules.scoring.domain.ScoringOpcion
+import com.security.modules.scoring.domain.metodologia.CalculoScoring
+import com.security.modules.scoring.dto.ClienteNuevoRequest
+import com.security.modules.scoring.dto.DatosScoringRequest
+import com.security.modules.scoring.infrastructure.ScoringDepartamentoRepository
+import com.security.modules.scoring.infrastructure.ScoringOcupacionRepository
+import com.security.modules.scoring.infrastructure.ScoringOpcionRepository
+import com.security.modules.scoring.infrastructure.ScoringPaisGrupoRepository
 import jakarta.persistence.EntityManager
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -67,6 +76,11 @@ class DemoInicioService(
     private val designaciones: OcDesignacionRepository,
     private val reloj: RelojInicio,
     private val plazoDenuncias: PlazoDenunciasService,
+    private val scoringService: ScoringService,
+    private val ocupacionRepository: ScoringOcupacionRepository,
+    private val opcionRepository: ScoringOpcionRepository,
+    private val departamentoRepository: ScoringDepartamentoRepository,
+    private val paisGrupoRepository: ScoringPaisGrupoRepository,
     private val em: EntityManager
 ) {
     private val json = jacksonObjectMapper()
@@ -76,6 +90,13 @@ class DemoInicioService(
         const val PREFIJO_RO = "RO-DEMO-"
         const val PREFIJO_DENUNCIA = "DEMO-"
         const val MARCA_OFICIAL = "__demo_inicio__"
+        const val PREFIJO_SCORING = "DEMO-"
+
+        /** Departamento y provincia (texto, como los guarda el formulario) de quien realiza la operacion. */
+        private val UBICACIONES = listOf(
+            "Lima" to "Lima", "Arequipa" to "Arequipa", "Cusco" to "Cusco", "Piura" to "Piura", "La Libertad" to "Trujillo",
+            "Junín" to "Huancayo", "Lambayeque" to "Chiclayo", "Callao" to "Callao"
+        )
 
         private val NOMBRES = listOf("Lucía", "Mateo", "Valeria", "Diego", "Camila", "Joaquín", "Renata", "Bruno", "Ximena", "Thiago", "Antonella", "Gael")
         private val APELLIDOS = listOf("Ficticio", "Ejemplar", "Prueba", "Muestra", "Modelo", "Ensayo", "Simulado", "Demostrado", "Patrón", "Boceto", "Borrador", "Maqueta")
@@ -94,7 +115,8 @@ class DemoInicioService(
         "consultas" to idsConsultas(empresa).size,
         "registros" to idsRegistros(empresa).size,
         "denuncias" to idsDenuncias(empresa).size,
-        "oficial" to idsDesignaciones(empresa).size
+        "oficial" to idsDesignaciones(empresa).size,
+        "scoring" to idsScoring(empresa).size
     )
 
     // ================================================================== cargar
@@ -107,7 +129,8 @@ class DemoInicioService(
             "consultas" to crearConsultas(admin, empresa),
             "registros" to crearRegistros(admin, empresa),
             "denuncias" to crearDenuncias(admin, empresa),
-            "oficial" to crearOficial(empresa)
+            "oficial" to crearOficial(empresa),
+            "scoring" to crearScoring(admin, empresa)
         )
         return DemoCargaResponse(cargado = true, yaEstaba = false, creados = creados)
     }
@@ -150,6 +173,8 @@ class DemoInicioService(
             nativo("DELETE FROM denuncia_archivos WHERE denuncia_id IN (:ids)", denunciasIds)
             nativo("DELETE FROM denuncias WHERE id IN (:ids)", denunciasIds)
         }
+        val scoringIds = idsScoring(empresa)
+        if (scoringIds.isNotEmpty()) nativo("DELETE FROM scoring_riesgo WHERE id IN (:ids)", scoringIds)
         if (designacionesIds.isNotEmpty()) {
             nativo("DELETE FROM oc_evento_cambio WHERE evento_id IN (SELECT id FROM oc_evento WHERE designacion_id IN (:ids))", designacionesIds)
             nativo("DELETE FROM oc_evento WHERE designacion_id IN (:ids)", designacionesIds)
@@ -162,7 +187,8 @@ class DemoInicioService(
             cargado = false,
             eliminados = linkedMapOf(
                 "consultas" to consultasIds.size, "registros" to registrosIds.size,
-                "denuncias" to denunciasIds.size, "oficial" to designacionesIds.size
+                "denuncias" to denunciasIds.size, "oficial" to designacionesIds.size,
+                "scoring" to scoringIds.size
             )
         )
     }
@@ -380,6 +406,8 @@ class DemoInicioService(
                         tipoDocumento = "DNI"; numeroDocumento = "00%06d".format(100000 + i); this.nombres = nombres
                         this.apellidos = apellidos; nacionalidad = "Peruana"; tipoPersona = "NATURAL"
                         domicilio = "Dirección de demostración"
+                        val lugar = UBICACIONES[if (i % 3 == 0) 0 else i % UBICACIONES.size]
+                        departamento = lugar.first; provincia = lugar.second
                     },
                     personaRepresentada = null,
                     operacion = Operacion(
@@ -471,6 +499,69 @@ class DemoInicioService(
         lista += nueva(CausaDenuncia.CONFLICTO, ahora.minusDays(plazoDenuncias.dias + 5), EstadoDenuncia.EN_PROCESO, null)
         denuncias.saveAll(lista)
         return lista.size
+    }
+
+    // ================================================================== Scoring (cabina)
+
+    private fun idsScoring(empresa: String): List<Int> =
+        em.createQuery(
+            """
+            SELECT s.id FROM ScoringRiesgo s JOIN s.usuario u
+            WHERE s.clienteDocumento LIKE :prefijo AND LOWER(TRIM(u.empresa)) = LOWER(TRIM(:empresa))
+            """,
+            Int::class.javaObjectType
+        ).setParameter("prefijo", "$PREFIJO_SCORING%").setParameter("empresa", empresa).resultList
+
+    /**
+     * 44 evaluaciones de la version 2 en 10 departamentos, repartidas en los ultimos 30 dias, calculadas y guardadas con
+     * el MISMO servicio de scoring (sin consumir tokens), asi su detalle y su PDF abren igual que una real.
+     */
+    private fun crearScoring(admin: Usuario, empresa: String): Int {
+        fun <T> cercano(lista: List<T>, objetivo: Int, puntaje: (T) -> Int?): T? =
+            lista.filter { puntaje(it) != null }.minByOrNull { kotlin.math.abs(puntaje(it)!! - objetivo) }
+        val ocupaciones = ocupacionRepository.findAll()
+        val opciones = opcionRepository.findAll()
+        fun opcion(tipo: String, objetivo: Int) = cercano(opciones.filter { it.tipo == tipo }, objetivo) { it.puntaje }
+        val pais = paisGrupoRepository.todosConPais().filter { it.grupo != null && it.altoRiesgoGafi != true }.minByOrNull { it.grupo!! }
+            ?: return 0
+        val porNombre = departamentoRepository.findAll().filter { it.puntajeV2 != null }
+            .associateBy { CalculoScoring.normalizar(it.nombre) }
+        val deptos = listOf("LIMA", "AREQUIPA", "CUSCO", "PIURA", "LA LIBERTAD", "JUNIN", "LAMBAYEQUE", "ICA", "PUNO", "CALLAO")
+            .mapNotNull { porNombre[it] }.ifEmpty { return 0 }
+        val ahora = reloj.ahora()
+        var creadas = 0
+        for (k in 0 until 44) {
+            // Nivel buscado: Alto (ocupacion y monto en 4: regla de dos factores en 4), Medio o Bajo.
+            val objetivo = when {
+                k % 6 == 0 -> 4
+                k % 3 == 1 -> 3
+                else -> 1
+            }
+            val depto = deptos[(k * 7) % deptos.size]
+            val (nombre, paterno, materno) = nombreFicticio(k + 500)
+            val request = DatosScoringRequest(
+                cliente = ClienteNuevoRequest("NATURAL", "DNI", PREFIJO_SCORING + "%04d".format(k + 1), "$paterno $materno, $nombre"),
+                ocupacionId = cercano(ocupaciones, objetivo) { it.puntajeV2 }?.id,
+                montoOperacion = BigDecimal(
+                    when (objetivo) {
+                        4 -> 800000
+                        3 -> 200000
+                        else -> 8000 + 500 * k
+                    }
+                ),
+                productoId = opcion(ScoringOpcion.PRODUCTO, if (objetivo == 1) 1 else 3)?.id,
+                canalId = opcion(ScoringOpcion.CANAL, if (objetivo == 1) 1 else 2)?.id,
+                medioPagoId = opcion(ScoringOpcion.MEDIO_PAGO, if (objetivo == 1) 1 else 2)?.id,
+                departamentoResidenciaId = depto.id,
+                departamentoOperacionId = depto.id,
+                paisFondosId = pais.pais.id
+            )
+            // Repartidas en los ultimos 30 dias, nunca en el futuro.
+            val fecha = limitar(ahora.minusDays((k * 29L) / 43).withHour(9 + k % 9).withMinute((k * 13) % 60), ahora.minusDays(30))
+            scoringService.evaluarDemostracion(admin, request, fecha)
+            creadas++
+        }
+        return creadas
     }
 
     // ================================================================== Oficial de cumplimiento

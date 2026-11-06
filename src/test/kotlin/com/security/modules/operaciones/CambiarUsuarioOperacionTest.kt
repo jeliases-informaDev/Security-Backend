@@ -35,7 +35,7 @@ class CambiarUsuarioOperacionTest {
     fun `endpoint cambia id usuario usando la empresa del usuario anterior`() {
         preparar()
         every { operaciones.cambiarUsuario(77L, 1, 2) } returns 1
-        val resultado = OperacionController(service, acceso).cambiarUsuarioOperacion(77L, CambiarUsuarioOperacionRequest(2))
+        val resultado = OperacionController(service, acceso, mockk(), mockk(), mockk()).cambiarUsuarioOperacion(77L, CambiarUsuarioOperacionRequest(2))
         verify(exactly = 1) { acceso.comprobarRegistro(77L) }
         assertEquals(77L, resultado.id)
         assertEquals(2, resultado.usuarioId)

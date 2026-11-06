@@ -4,6 +4,7 @@ import com.security.modules.licencias.CobroAcciones
 import com.security.modules.licencias.conCobro
 import com.security.modules.licencias.dominio.TIPO_OPERACION_PDF
 import com.security.modules.operaciones.application.service.AccesoEmpresaService
+import com.security.modules.operaciones.application.service.CodigosOperaciones
 import com.security.modules.operaciones.application.usecase.ExportarOperacionPdfUseCase
 import com.security.modules.operaciones.application.usecase.OperacionNoEncontradaException
 import com.security.shared.exceptions.ResourceNotFoundException
@@ -36,10 +37,13 @@ class OperacionPdfController(
     ): ResponseEntity<ByteArray> {
         // Solo el PDF de un registro de la propia empresa (un administrador, cualquiera).
         acceso.comprobarRegistro(id)
+        val autor = acceso.actor().autor()
         // Se avisa a Sulotec (operacion_pdf); la misma persona y el mismo registro en dos minutos dan la misma clave.
-        val pdf = cobro.conCobro(TIPO_OPERACION_PDF, "PDF de la operacion $id", criterios = listOf(id.toString())) {
-            exportarOperacionPdfUseCase.ejecutar(id)
+        // La descarga queda en el historial dentro de la misma accion: si no se pudo anotar, se anula el cobro.
+        val generado = cobro.conCobro(TIPO_OPERACION_PDF, "PDF de la operacion $id", criterios = listOf(id.toString())) {
+            exportarOperacionPdfUseCase.ejecutar(id, autor)
         }
+        val pdf = generado.bytes
 
         val headers = HttpHeaders().apply {
             contentType = MediaType.APPLICATION_PDF
@@ -47,6 +51,9 @@ class OperacionPdfController(
                 .filename("operacion_$id.pdf")
                 .build()
             contentLength = pdf.size.toLong()
+            set("X-Codigo-Verificacion", generado.codigoVerificacion)
+            set("X-Huella-Sha256", generado.huella)
+            set("X-Paginas", "1")
         }
 
         return ResponseEntity.ok()
@@ -60,7 +67,7 @@ class OperacionPdfController(
         ex: OperacionNoEncontradaException
     ): ResponseEntity<Map<String, String>> =
         ResponseEntity.status(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("mensaje" to (ex.message ?: "Operación no encontrada")))
+            .body(mapOf("mensaje" to (ex.message ?: "Operación no encontrada"), "code" to CodigosOperaciones.NO_ENCONTRADA))
 
     // Registro de otra empresa: mismo 404 que si no existiera.
     @ExceptionHandler(ResourceNotFoundException::class)
@@ -68,7 +75,7 @@ class OperacionPdfController(
         ex: ResourceNotFoundException
     ): ResponseEntity<Map<String, String>> =
         ResponseEntity.status(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("mensaje" to (ex.message ?: "Operación no encontrada")))
+            .body(mapOf("mensaje" to (ex.message ?: "Operación no encontrada"), "code" to CodigosOperaciones.NO_ENCONTRADA))
 
     @ExceptionHandler(IllegalArgumentException::class)
     fun idInvalido(

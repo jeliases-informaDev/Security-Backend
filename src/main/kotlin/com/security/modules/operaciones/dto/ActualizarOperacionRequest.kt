@@ -1,20 +1,20 @@
 package com.security.modules.operaciones.dto
 
 import com.tuempresa.operaciones.dto.*
-import jakarta.validation.Valid
-import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotEmpty
 import java.time.LocalDate
 
+/** Edicion (RO 6): el formulario completo mas el motivo (obligatorio, hasta 300 caracteres). */
 data class ActualizarOperacionRequest(
-    @field:Valid val registro: RegistroEditableDto,
-    @field:Valid val personaFisica: PersonaDto,
-    @field:Valid val personaRepresentada: PersonaDto?,
-    @field:Valid val operacion: OperacionDto,
-    @field:Valid @field:NotEmpty val beneficiarios: List<BeneficiarioDto>
+    val registro: RegistroEditableDto = RegistroEditableDto(),
+    val personaFisica: PersonaDto = PersonaDto(),
+    val personaRepresentada: PersonaDto? = null,
+    val operacion: OperacionDto = OperacionDto(),
+    val beneficiarios: List<BeneficiarioDto> = emptyList(),
+    val motivo: String? = null
 )
 
+/** fechaRegistro se ignora: la fecha de registro no se edita. */
 data class RegistroEditableDto(
-    @field:NotBlank val oficina: String,
-    val fechaRegistro: LocalDate
+    val oficina: String? = null,
+    val fechaRegistro: LocalDate? = null
 )

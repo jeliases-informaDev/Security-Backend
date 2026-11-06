@@ -48,4 +48,34 @@ class Persona {
 
     @Column(name = "distrito", length = 100)
     var distrito: String? = null
+
+    // ---- Campos de la entrega A del diseño nuevo: todos opcionales (los registros anteriores no los tienen) ----
+
+    @Column(name = "motivo_sin_documento", length = 300)
+    var motivoSinDocumento: String? = null
+
+    @Column(name = "estado_civil", length = 30)
+    var estadoCivil: String? = null
+
+    // Solo la persona representada: NATURAL o JURIDICA (null = registro anterior, se trata como NATURAL).
+    @Column(name = "tipo_persona", length = 10)
+    var tipoPersona: String? = null
+
+    @Column(name = "razon_social", length = 255)
+    var razonSocial: String? = null
+
+    @Column(name = "representante_legal", length = 255)
+    var representanteLegal: String? = null
+
+    @Column(name = "representante_tipo_documento", length = 50)
+    var representanteTipoDocumento: String? = null
+
+    @Column(name = "representante_numero_documento", length = 50)
+    var representanteNumeroDocumento: String? = null
+
+    @Column(name = "accionistas_mayores_25", columnDefinition = "TEXT")
+    var accionistasMayores25: String? = null
+
+    @Column(name = "domicilio_fiscal", columnDefinition = "TEXT")
+    var domicilioFiscal: String? = null
 }

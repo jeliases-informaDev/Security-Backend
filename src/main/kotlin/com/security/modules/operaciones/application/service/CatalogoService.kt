@@ -8,15 +8,32 @@ import org.springframework.stereotype.Service
 
 @Service
 @Transactional(readOnly = true)
-class CatalogoService(private val catalogoRepository: CatalogoRepository) {
+class CatalogoService(
+    private val catalogoRepository: CatalogoRepository,
+    private val catalogosRegistro: CatalogosRegistro? = null
+) {
 
-    fun catalogos() = CatalogosOperacionResponse(
-        monedas = catalogoRepository.monedas(),
-        ocupaciones = catalogoRepository.ocupaciones(),
-        tiposDocumento = catalogoRepository.tiposDocumento(),
-        departamentos = catalogoRepository.departamentos(),
-        paises = catalogoRepository.paises()
-    )
+    fun catalogos(): CatalogosOperacionResponse {
+        val registro = catalogosRegistro?.cargar()
+        fun lista(catalogo: String) = registro?.de(catalogo).orEmpty().map {
+            com.security.modules.operaciones.dto.OpcionRegistroResponse(it.codigo, it.nombre, it.pideTexto, it.sector)
+        }
+        return CatalogosOperacionResponse(
+            monedas = catalogoRepository.monedas(),
+            ocupaciones = catalogoRepository.ocupaciones(),
+            tiposDocumento = catalogoRepository.tiposDocumento(),
+            departamentos = catalogoRepository.departamentos(),
+            paises = catalogoRepository.paises(),
+            tiposDocumentoOperacion = lista(CatalogosOperacion.TIPO_DOCUMENTO),
+            estadosCiviles = lista(CatalogosOperacion.ESTADO_CIVIL),
+            modalidadesPago = lista(CatalogosOperacion.MODALIDAD_PAGO),
+            origenesFondos = lista(CatalogosOperacion.ORIGEN_FONDOS),
+            // Hasta que la empresa tenga sector (entrega B), los del sector inmobiliario.
+            tiposOperacion = lista(CatalogosOperacion.TIPO_OPERACION)
+                .filter { it.sector == null || it.sector == CatalogosOperacion.SECTOR_POR_DEFECTO },
+            tipoDocumentoInicial = CatalogosOperacion.DOCUMENTO_INICIAL
+        )
+    }
 
     fun ocupaciones() = catalogoRepository.ocupaciones()
     fun tiposDocumento() = catalogoRepository.tiposDocumento()

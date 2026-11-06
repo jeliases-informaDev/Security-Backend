@@ -1,6 +1,7 @@
 package com.security.modules.operaciones.dto
 
 import com.security.modules.operaciones.domain.model.*
+import java.time.LocalDate
 
 /** Datos del formulario; no expone entidades JPA ni sus relaciones. */
 data class DetalleOperacionResponse(
@@ -10,5 +11,9 @@ data class DetalleOperacionResponse(
     val personaFisica: PersonaExportacion,
     val personaRepresentada: PersonaExportacion?,
     val operacion: DatosOperacionExportacion,
-    val beneficiarios: List<BeneficiarioExportacion>
+    val beneficiarios: List<BeneficiarioExportacion>,
+    val estado: String = "PENDIENTE",
+    val responsable: UsuarioAsignableResponse? = null,
+    val conservarHasta: LocalDate? = null,
+    val historialReciente: List<EventoOperacionResponse> = emptyList()
 )

@@ -101,4 +101,27 @@ class CatalogoOperacionesInicializadorTest {
         assertTrue(guardadas.captured.all { it.departamento === junin })
         assertTrue(guardadas.captured.none { it.nombre == "Huancayo" })
     }
+
+    @Test
+    fun `el catalogo del formulario trae las opciones exactas de las fichas y solo agrega lo que falta`() {
+        val filas = inicializador.leerCatalogosRegistro()
+        val porCatalogo = filas.groupBy { it.catalogo }
+        assertEquals(5, porCatalogo.getValue("TIPO_DOCUMENTO").size)
+        assertEquals(5, porCatalogo.getValue("ESTADO_CIVIL").size)
+        assertEquals(9, porCatalogo.getValue("MODALIDAD_PAGO").size)
+        assertEquals(7, porCatalogo.getValue("ORIGEN_FONDOS").size)
+        assertEquals(12, porCatalogo.getValue("TIPO_OPERACION").size)
+        assertTrue(porCatalogo.getValue("TIPO_OPERACION").all { it.sector == "INMOBILIARIO" })
+        assertEquals("Tarjeta de crédito o débito", porCatalogo.getValue("MODALIDAD_PAGO").single { it.codigo == "TARJETA" }.nombre)
+        assertEquals(listOf("SIN_DOCUMENTO"), porCatalogo.getValue("TIPO_DOCUMENTO").filter { it.pideTexto }.map { it.codigo })
+        assertEquals(filas.size, filas.map { it.catalogo to it.codigo }.toSet().size)
+
+        val repositorio = mockk<com.security.modules.operaciones.infraestructure.CatalogoOperacionRepository>()
+        val conRepositorio = CatalogoOperacionesInicializador(monedas, provincias, departamentos, transacciones, repositorio)
+        every { repositorio.findAll() } returns filas.take(3)
+        val guardadas = slot<List<com.security.modules.operaciones.domain.CatalogoOperacionEntity>>()
+        every { repositorio.saveAll(capture(guardadas)) } answers { firstArg() }
+        assertEquals(filas.size - 3, conRepositorio.sembrarCatalogosRegistro(filas))
+        assertEquals(filas.size - 3, guardadas.captured.size)
+    }
 }

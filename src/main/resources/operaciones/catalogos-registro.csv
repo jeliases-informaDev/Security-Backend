@@ -1,0 +1,39 @@
+catalogo;codigo;nombre;orden;pide_texto;sector
+TIPO_DOCUMENTO;DNI;DNI;1;false;
+TIPO_DOCUMENTO;CE;CE (carné de extranjería);2;false;
+TIPO_DOCUMENTO;PASAPORTE;PASAPORTE;3;false;
+TIPO_DOCUMENTO;RUC;RUC;4;false;
+TIPO_DOCUMENTO;SIN_DOCUMENTO;SIN DOCUMENTO;5;true;
+ESTADO_CIVIL;SOLTERO;Soltero(a);1;false;
+ESTADO_CIVIL;CASADO;Casado(a);2;false;
+ESTADO_CIVIL;CONVIVIENTE;Conviviente;3;false;
+ESTADO_CIVIL;VIUDO;Viudo(a);4;false;
+ESTADO_CIVIL;DIVORCIADO;Divorciado(a);5;false;
+MODALIDAD_PAGO;EFECTIVO;Efectivo;1;false;
+MODALIDAD_PAGO;TRANSFERENCIA_BANCARIA;Transferencia bancaria;2;false;
+MODALIDAD_PAGO;CHEQUE_GERENCIA;Cheque de gerencia;3;false;
+MODALIDAD_PAGO;CHEQUE;Cheque;4;false;
+MODALIDAD_PAGO;TARJETA;Tarjeta de crédito o débito;5;false;
+MODALIDAD_PAGO;CREDITO_BANCARIO;Crédito o financiamiento bancario;6;false;
+MODALIDAD_PAGO;DEPOSITO_CUENTA;Depósito en cuenta;7;false;
+MODALIDAD_PAGO;PAGO_TERCERO;Pago de un tercero;8;false;
+MODALIDAD_PAGO;OTRO;Otro (especificar);9;true;
+ORIGEN_FONDOS;AHORROS;Ahorros;1;false;
+ORIGEN_FONDOS;VENTA_BIEN;Venta de un bien;2;false;
+ORIGEN_FONDOS;PRESTAMO;Préstamo o financiamiento;3;false;
+ORIGEN_FONDOS;HERENCIA_DONACION;Herencia o donación;4;false;
+ORIGEN_FONDOS;TRABAJO_DEPENDIENTE;Ingresos por trabajo dependiente;5;false;
+ORIGEN_FONDOS;NEGOCIO_PROPIO;Ingresos de negocio propio;6;false;
+ORIGEN_FONDOS;OTRO;Otro (especificar);7;true;
+TIPO_OPERACION;COMPRA_LOTE;Compra de lote de terreno;1;false;INMOBILIARIO
+TIPO_OPERACION;VENTA_LOTE;Venta de lote de terreno;2;false;INMOBILIARIO
+TIPO_OPERACION;COMPRA_VIVIENDA;Compra de vivienda;3;false;INMOBILIARIO
+TIPO_OPERACION;VENTA_VIVIENDA;Venta de vivienda;4;false;INMOBILIARIO
+TIPO_OPERACION;COMPRA_DEPARTAMENTO;Compra de departamento;5;false;INMOBILIARIO
+TIPO_OPERACION;VENTA_DEPARTAMENTO;Venta de departamento;6;false;INMOBILIARIO
+TIPO_OPERACION;COMPRA_OFICINA;Compra de oficina;7;false;INMOBILIARIO
+TIPO_OPERACION;VENTA_OFICINA;Venta de oficina;8;false;INMOBILIARIO
+TIPO_OPERACION;COMPRA_LOCAL_COMERCIAL;Compra de local comercial;9;false;INMOBILIARIO
+TIPO_OPERACION;VENTA_LOCAL_COMERCIAL;Venta de local comercial;10;false;INMOBILIARIO
+TIPO_OPERACION;COMPRA_ESTACIONAMIENTO;Compra de estacionamiento;11;false;INMOBILIARIO
+TIPO_OPERACION;VENTA_ESTACIONAMIENTO;Venta de estacionamiento;12;false;INMOBILIARIO

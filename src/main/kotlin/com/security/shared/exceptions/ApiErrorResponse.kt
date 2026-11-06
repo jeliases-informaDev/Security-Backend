@@ -17,5 +17,7 @@ data class ApiErrorResponse(
     val enlace: String? = null,
     val estado: String? = null,
     val activos: Long? = null,
-    @JsonProperty("usuarios_max") val usuariosMax: Long? = null
+    @JsonProperty("usuarios_max") val usuariosMax: Long? = null,
+    // Errores de datos de un formulario: campo -> mensaje (Registro de Operaciones)
+    val campos: Map<String, String>? = null
 )

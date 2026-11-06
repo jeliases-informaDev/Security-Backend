@@ -43,6 +43,29 @@ Sin empresa en la cuenta → bloque `null`. Mes = `fecha_registro`.
 - `porSituacion`: las 6 situaciones con la etiqueta del servidor, de mayor a menor (solo las que tienen denuncias).
 - El aislamiento por empresa de denuncias/historial está **diferido** por decisión del usuario: se usa la regla actual sin cambios.
 
+## Cabina de mando (`cabina`, CONTRATO-CABINA.md parte B)
+
+Solo para el administrador universal y el de empresa (quien mira toda la empresa); para las demás cuentas `cabina` es `null`.
+Cada instrumento usa el alcance de su módulo y una consulta agrupada por serie o instrumento (nada por fila); si uno falla, ese
+va `null` y el resto sale igual.
+- `scoring`: evaluaciones **versión 2** del mes. Visibilidad por la empresa **actual** de la cuenta que evaluó (`scoring_riesgo` no
+  guarda empresa, igual que su historial). `escala` sale de `MetodologiaV2`: min 1, max 4, `corteMedio` 1,75, `corteAlto` 2,50
+  (no 2 y 3 como el ejemplo). `radar`: los 8 factores en el orden de la metodología (con `codigo` además de `factor`), promedio del
+  puntaje guardado en el JSON `resultado` del mes y del mes anterior; vacío si no hay evaluaciones.
+- `tendencia`: 30 días que terminan hoy (o el fin del mes pedido). Una serie es `null` si la cuenta no ve ese módulo.
+- `mapa.departamentos`: registros y monto US$ por el **departamento de quien realiza la operación** (la operación no guarda
+  provincia: `lugar` es texto libre; se usa `personas_operacion.departamento`, o su provincia si falta, aceptando nombre o id del
+  catálogo); evaluaciones y altos por departamento de residencia. `codigo` INEI por nombre normalizado; si no calza, `null`.
+- `plazos` (los 6 más cercanos; `dias` negativo = vencido): `COMUNICACION_UIF` (designación, pendientes y remoción del oficial),
+  `VACANCIA_OFICIAL` (extra: designar un nuevo oficial), `DECLARACION` (revisión sugerida de la declaración jurada: regla
+  `REVISION_SUGERIDA`, 12 meses desde la firma), `DENUNCIA` (abiertas, solo el código de seguimiento) y `REGISTRO_MENSUAL`
+  (registros del mes anterior sin constancia de envío; **vence el último día del mes en curso: supuesto a confirmar**, el sistema
+  no tiene una fecha límite de envío).
+- `licencia`: la misma lectura que `GET /api/licencia` (caché y timeout del módulo de licencias); `null` si las licencias están
+  apagadas, la empresa no tiene licencia o el servicio no responde. La ven el universal y el administrador de empresa (titular).
+- Demostración: además, 44 evaluaciones de scoring v2 calculadas y guardadas con `ScoringService` (sin consumir tokens; cliente
+  con documento `DEMO-NNNN`), en 10 departamentos y los últimos 30 días, y registros en 8 departamentos.
+
 ## Datos de demostración
 
 Van a la empresa de la cuenta del administrador universal, con una marca que ningún dato real puede tener:

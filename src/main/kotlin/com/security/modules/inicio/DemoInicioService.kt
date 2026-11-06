@@ -170,14 +170,14 @@ class DemoInicioService(
     private fun idsConsultas(empresa: String): List<Long> =
         em.createQuery(
             "SELECT c.id FROM ConsultaLista c WHERE c.criterioTipoDocumento = :marca AND LOWER(TRIM(c.empresa)) = LOWER(TRIM(:empresa))",
-            java.lang.Long::class.java
-        ).setParameter("marca", MARCA_CONSULTA).setParameter("empresa", empresa).resultList.map { it.toLong() }
+            Long::class.javaObjectType
+        ).setParameter("marca", MARCA_CONSULTA).setParameter("empresa", empresa).resultList
 
     private fun idsRegistros(empresa: String): List<Long> =
         em.createQuery(
             "SELECT r.id FROM RegistroOperacionesEntity r WHERE r.numeroRegistro LIKE :prefijo AND LOWER(TRIM(r.empresa)) = LOWER(TRIM(:empresa))",
-            java.lang.Long::class.java
-        ).setParameter("prefijo", "$PREFIJO_RO%").setParameter("empresa", empresa).resultList.map { it.toLong() }
+            Long::class.javaObjectType
+        ).setParameter("prefijo", "$PREFIJO_RO%").setParameter("empresa", empresa).resultList
 
     private fun idsDenuncias(empresa: String): List<Int> =
         em.createQuery(
@@ -185,15 +185,15 @@ class DemoInicioService(
             SELECT d.id FROM DenunciaEntity d LEFT JOIN d.receptorUsuario r LEFT JOIN d.creadoPorUsuario c
             WHERE d.codigoSeguimiento LIKE :prefijo AND LOWER(TRIM(COALESCE(r.empresa, c.empresa))) = LOWER(TRIM(:empresa))
             """,
-            java.lang.Integer::class.java
-        ).setParameter("prefijo", prefijoDenuncia(empresa) + "%").setParameter("empresa", empresa).resultList.map { it.toInt() }
+            Int::class.javaObjectType
+        ).setParameter("prefijo", prefijoDenuncia(empresa) + "%").setParameter("empresa", empresa).resultList
 
     private fun idsDesignaciones(empresa: String): List<Long> {
         val e = empresas.findByNombreIgnoreCase(empresa)?.id ?: return emptyList()
         return em.createQuery(
             "SELECT d.id FROM OcDesignacion d WHERE d.guardadaPorUsuario = :marca AND d.empresaId = :empresa",
-            java.lang.Long::class.java
-        ).setParameter("marca", MARCA_OFICIAL).setParameter("empresa", e).resultList.map { it.toLong() }
+            Long::class.javaObjectType
+        ).setParameter("marca", MARCA_OFICIAL).setParameter("empresa", e).resultList
     }
 
     private fun prefijoDenuncia(empresa: String) =

@@ -38,9 +38,9 @@ Sin empresa en la cuenta → bloque `null`. Mes = `fecha_registro`.
 
 **Canal de denuncias** (`denuncias`). Alcance como el módulo: universal y administrador de empresa, su empresa (la del receptor o, si no tiene, la de quien registró); supervisor, lo asignado a él; otras cuentas → `null`.
 - `recibidas`, `porSituacion`: creadas en el mes. `porAtender` (no cerradas) y `sinAbrir` (`RECIBIDO`): hoy, de cualquier fecha.
-- **No hay plazo en el modelo**: se usa `app.inicio.denuncias.plazo-dias` (30 días calendario por defecto, **por confirmar**). `vencidas`: abiertas con más días que el plazo. `plazosATiempoPct`: cerradas en el mes dentro del plazo. `tiempoPromedioCierreDias`: promedio de días (creación → cierre) de las cerradas en el mes.
-- **`cierres` y `derivadasAlOficial` van `null`**: el modelo no guarda el resultado del cierre (fundada/infundada/archivada) ni la derivación al oficial.
-- `porSituacion`: el modelo tiene 3 causas (Conflicto de intereses, Soborno o corrupción, Acoso u hostigamiento), no las 6 situaciones del diseño.
+- Plazo de atención (docs/DENUNCIAS-CIERRE.md): `plaft.denuncias.plazo-atencion-dias`, 30 días calendario por defecto, **a confirmar con el usuario**. `vencidas`: no cerradas y hoy > creación + plazo. `plazosATiempoPct`: cerradas en el mes con cierre ≤ creación + plazo. `tiempoPromedioCierreDias`: promedio de días (creación → cierre) de las cerradas en el mes.
+- `cierres`: reparto en % por `resultadoCierre` de las cerradas en el mes **que tienen resultado** (las cerradas antes de existir el dato no cuentan); `null` si ninguna tiene. `derivadasAlOficial`: cantidad derivada en el mes (por `fechaDerivacion`); el detalle es reservado y nunca sale aquí.
+- `porSituacion`: las 6 situaciones con la etiqueta del servidor, de mayor a menor (solo las que tienen denuncias).
 - El aislamiento por empresa de denuncias/historial está **diferido** por decisión del usuario: se usa la regla actual sin cambios.
 
 ## Datos de demostración
@@ -51,7 +51,7 @@ Van a la empresa de la cuenta del administrador universal, con una marca que nin
 |---|---|---|
 | Consultas de listas | `criterio_tipo_documento = 'DEMO'` | 312 del mes (72 con coincidencia: 12 críticas, 25 altas, 35 medias; 19 PEP; 11 homónimos; 2 críticas sin decidir, de ayer y de hoy) + 297 del mes anterior |
 | Registros de operaciones | `numero_registro = 'RO-DEMO-NNNNNN'` (no mueve el contador RO-AAAA) | 64 del mes (≈ US$ 2,4 M, 19 sobre el umbral, 3 inusuales, 58 el mismo día; los 3 últimos como el diseño) + 30 del mes anterior |
-| Denuncias | `codigo_seguimiento = 'DEMO-<hash de la empresa>-NNN'` | 24 recibidas en el mes, 5 por atender (2 sin abrir), 1 vencida, 28 cerradas en el mes (82 % a tiempo, 9 días en promedio) |
+| Denuncias | `codigo_seguimiento = 'DEMO-<hash de la empresa>-NNN'` | 24 recibidas en el mes (situaciones 8/5/4/3/2/2), 5 por atender (2 sin abrir), 1 vencida, 28 cerradas en el mes (82 % a tiempo, 9 días en promedio; 15 con resultado: 40/33/27 %), 2 derivadas al oficial |
 | Oficial | designación guardada por `__demo_inicio__` | Mariana Quispe Valdivia, titular vigente, comunicada a la UIF el 2026-03-20; **solo si la empresa no tiene un titular activo** |
 
 El resultado de cada consulta se calcula con `CalculoListas` y las reglas vigentes (el detalle y el PDF se ven completos). Nombres,

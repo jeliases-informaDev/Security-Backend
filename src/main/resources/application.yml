@@ -78,6 +78,11 @@ app:
     admin-password: ${APP_SEED_ADMIN_PASSWORD:Admin12345!}
     admin-email: ${APP_SEED_ADMIN_EMAIL:admin@security.local}
 
+# Canal de denuncias: plazo de atencion en dias calendario desde la creacion (SUPUESTO A CONFIRMAR; docs/DENUNCIAS-CIERRE.md)
+plaft:
+  denuncias:
+    plazo-atencion-dias: ${PLAFT_DENUNCIAS_PLAZO_ATENCION_DIAS:30}
+
 management:
   endpoints:
     web:

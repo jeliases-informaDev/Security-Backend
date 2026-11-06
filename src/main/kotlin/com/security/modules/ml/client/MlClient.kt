@@ -56,11 +56,11 @@ class MlClient(private val properties: MlProperties) {
                 .body(MlChatResponse::class.java)
         }
 
-    internal fun feedback(mensajeId: UUID, feedback: String) {
+    internal fun feedback(usuarioId: UUID, mensajeId: UUID, feedback: String) {
         llamar<Map<*, *>>("feedback de Indira") {
             rapido.post()
                 .uri("/api/v1/indira/mensajes/{id}/feedback", mensajeId)
-                .body(MlFeedbackRequest(feedback))
+                .body(MlFeedbackRequest(usuarioId, feedback))
                 .retrieve()
                 .body(Map::class.java)
         }

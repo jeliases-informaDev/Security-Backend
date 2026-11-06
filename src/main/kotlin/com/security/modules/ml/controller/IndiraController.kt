@@ -36,10 +36,11 @@ class IndiraController(
 
     @PostMapping("/indira/mensajes/{mensajeId}/feedback")
     fun feedback(
+        authentication: Authentication,
         @PathVariable mensajeId: UUID,
         @Valid @RequestBody request: IndiraFeedbackRequest
     ): ResponseEntity<Void> {
-        mlService.enviarFeedback(mensajeId, request.feedback)
+        mlService.enviarFeedback(authentication.name, mensajeId, request.feedback)
         return ResponseEntity.noContent().build()
     }
 

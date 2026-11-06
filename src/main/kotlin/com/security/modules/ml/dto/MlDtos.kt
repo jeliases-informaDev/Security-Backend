@@ -72,7 +72,10 @@ internal data class MlChatResponse(
     val respuesta: String
 )
 
-internal data class MlFeedbackRequest(val feedback: String)
+internal data class MlFeedbackRequest(
+    @JsonProperty("usuario_id") val usuarioId: UUID,
+    val feedback: String
+)
 
 internal data class MlCaso(
     val id: UUID,

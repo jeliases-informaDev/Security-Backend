@@ -53,12 +53,12 @@ class MlService(
         return IndiraChatResponse(respuesta.conversacionId, respuesta.mensajeId, respuesta.respuesta)
     }
 
-    fun enviarFeedback(mensajeId: UUID, feedback: String) {
+    fun enviarFeedback(username: String, mensajeId: UUID, feedback: String) {
         val valor = feedback.lowercase()
         if (valor !in FEEDBACKS_VALIDOS) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Feedback no válido. Use 'positivo' o 'negativo'")
         }
-        mlClient.feedback(mensajeId, valor)
+        mlClient.feedback(uuidDeUsuario(username), mensajeId, valor)
     }
 
     fun buscarPersona(texto: String): PersonaConCasosResponse {

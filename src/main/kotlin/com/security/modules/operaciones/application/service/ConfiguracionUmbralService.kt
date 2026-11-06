@@ -47,8 +47,12 @@ class ConfiguracionOperacionesService(
     private val catalogos: CatalogosRegistro
 ) {
 
+    // Sin parametros por defecto: los dobles de prueba (mockk) no los pueden calcular.
     @Transactional(readOnly = true)
-    fun de(empresa: String, cat: Catalogos = catalogos.cargar()): ConfiguracionEfectiva {
+    fun de(empresa: String): ConfiguracionEfectiva = de(empresa, catalogos.cargar())
+
+    @Transactional(readOnly = true)
+    fun de(empresa: String, cat: Catalogos): ConfiguracionEfectiva {
         val entidad = repository.findByEmpresa(claveEmpresa(empresa))
         val sector = entidad?.sector?.let { cat.opcion(CatalogosOperacion.SECTOR, it) }
         val grupo = sector?.sector
@@ -156,7 +160,7 @@ class TipoCambioService(
         repository.findByEmpresaAndMonedaAndMes(claveEmpresa(empresa), moneda, mes.toString())
             ?: repository.findByEmpresaAndMonedaAndMes(TipoCambioOperacionEntity.SULOTEC, moneda, mes.toString())
 
-    fun monedas(cat: Catalogos = catalogos.cargar()): List<String> = cat.monedas.map { it.codigo }.filter { it != "PEN" }
+    fun monedas(): List<String> = catalogos.cargar().monedas.map { it.codigo }.filter { it != "PEN" }
 
     @Transactional(readOnly = true)
     fun listar(empresa: String?, anio: Int, puedeEditar: Boolean): TiposCambioResponse {
@@ -217,8 +221,11 @@ class UmbralService(
     private val umbralRepositorio: UmbralNormaRepository
 ) {
 
+    fun evaluar(empresa: String, tipoOperacion: String?, moneda: String?, monto: BigDecimal?, fechaOperacion: LocalDate?) =
+        evaluar(empresa, tipoOperacion, moneda, monto, fechaOperacion, catalogos.cargar())
+
     fun evaluar(empresa: String, tipoOperacion: String?, moneda: String?, monto: BigDecimal?, fechaOperacion: LocalDate?,
-                cat: Catalogos = catalogos.cargar()): VerificacionUmbralResponse {
+                cat: Catalogos): VerificacionUmbralResponse {
         val config = configuracion.de(empresa, cat)
         val tipo = cat.opcion(CatalogosOperacion.TIPO_OPERACION, tipoOperacion)
         val tipoBien = tipo?.tipoBien

@@ -277,6 +277,9 @@ class InicioIntegracionTest {
         }
         val nombresScoring = JsonPath.read<List<String>>(conDemo, "$.cabina.mundo.scoring.paises[*].nombre")
         assertTrue("Perú" in nombresScoring, "paises: $nombresScoring")
+        assertEquals(listOf("PE"), JsonPath.read<List<String?>>(conDemo, "$.cabina.mundo.scoring.paises[?(@.nombre == 'Perú')].codigo"))
+        val codigosPais = JsonPath.read<List<String?>>(conDemo, "$.cabina.mundo.listas.paises[*].codigo")
+        assertTrue(codigosPais.all { it != null && it.length == 2 } && codigosPais.toSet().size == codigosPais.size, "codigos: $codigosPais")
         val evaluacionesPais = JsonPath.read<List<Number>>(conDemo, "$.cabina.mundo.scoring.paises[*].evaluaciones").sumOf { it.toLong() }
         assertEquals(evaluaciones, evaluacionesPais)
         assertEquals(313L, JsonPath.read<List<Number>>(conDemo, "$.cabina.mundo.listas.paises[*].consultas").sumOf { it.toLong() } +

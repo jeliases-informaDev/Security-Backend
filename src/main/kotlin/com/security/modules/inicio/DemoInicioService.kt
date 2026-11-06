@@ -38,6 +38,7 @@ import com.security.modules.scoring.domain.ScoringOpcion
 import com.security.modules.scoring.domain.metodologia.CalculoScoring
 import com.security.modules.scoring.dto.ClienteNuevoRequest
 import com.security.modules.scoring.dto.DatosScoringRequest
+import com.security.modules.scoring.infrastructure.CatalogoPaisesIso
 import com.security.modules.scoring.infrastructure.ScoringDepartamentoRepository
 import com.security.modules.scoring.infrastructure.ScoringOcupacionRepository
 import com.security.modules.scoring.infrastructure.ScoringOpcionRepository
@@ -125,17 +126,15 @@ class DemoInicioService(
             "Inmobiliaria Los Andes S.A.C.", "Constructora Pacífico S.A.C.", "Desarrollos Valle Verde S.A.C.",
             "Proyectos Urbanos Horizonte S.A.C.", "Edificaciones Costa Norte S.A.C.", "Inmobiliaria Altiplano S.A.C."
         )
-        /** Paises para el mapa mundial (los nombres de la tabla pais). Alto riesgo GAFI: Irán, Myanmar, Corea del Norte. */
-        private val PAISES_ALTO = listOf("Estados Unidos", "Irán", "Perú", "Myanmar", "Venezuela", "Corea del Norte", "Panamá", "Rusia")
-        private val PAISES_BAJO = listOf(
-            "Colombia", "México", "Chile", "Brasil", "Argentina", "Ecuador", "España", "Estados Unidos", "Francia", "Alemania",
-            "Reino Unido", "China", "Emiratos Árabes Unidos", "Turquía", "Bolivia"
-        )
-        private val PAISES_CRITICAS = listOf("Rusia", "Irán", "Venezuela", "Corea del Norte", "China", "Panamá")
-        private val PAISES_CONSULTAS = listOf(
-            "Estados Unidos", "Colombia", "México", "Chile", "Brasil", "Argentina", "Ecuador", "Bolivia", "Panamá", "España",
-            "Francia", "Alemania", "Reino Unido", "China", "Emiratos Árabes Unidos", "Turquía", "Venezuela"
-        )
+        /**
+         * Paises del mapa mundial por codigo ISO alfa-2 (se usa la fila de la tabla pais cuyo nombre resuelve a ese codigo;
+         * si no hay, ese pais se omite y va Peru). Alto riesgo GAFI: IR (Irán), MM (Myanmar), KP (Corea del Norte).
+         */
+        private const val PERU = "PE"
+        private val PAISES_ALTO = listOf("US", "IR", "PE", "MM", "VE", "KP", "PA", "RU")
+        private val PAISES_BAJO = listOf("CO", "MX", "CL", "BR", "AR", "EC", "ES", "US", "FR", "DE", "GB", "CN", "AE", "TR", "BO")
+        private val PAISES_CRITICAS = listOf("RU", "IR", "VE", "KP", "CN", "PA")
+        private val PAISES_CONSULTAS = listOf("US", "CO", "MX", "CL", "BR", "AR", "EC", "BO", "PA", "ES", "FR", "DE", "GB", "CN", "AE", "TR", "VE")
 
         private val DIRECCIONES = listOf(
             "Av. Los Próceres 845", "Jr. Huallaga 312", "Calle Las Begonias 150", "Av. Ejército 1020", "Av. Grau 455",
@@ -422,11 +421,22 @@ class DemoInicioService(
     }
 
     /** Pais del consultado: las criticas, en paises con sanciones; PEP, Peru; el resto ~55 % Peru y 17 paises mas. */
-    private fun paisConsulta(p: PlanConsulta, i: Int): String = when {
-        p.tipo == Tipo.CRITICA -> PAISES_CRITICAS[i % PAISES_CRITICAS.size]
-        p.fila == "PEP_PERU" -> "Perú"
-        i % 20 < 11 -> "Perú"
-        else -> PAISES_CONSULTAS[(i / 20 + i) % PAISES_CONSULTAS.size]
+    private fun paisConsulta(p: PlanConsulta, i: Int): String {
+        val alfa2 = when {
+            p.tipo == Tipo.CRITICA -> PAISES_CRITICAS[i % PAISES_CRITICAS.size]
+            p.fila == "PEP_PERU" -> PERU
+            i % 20 < 11 -> PERU
+            else -> PAISES_CONSULTAS[(i / 20 + i) % PAISES_CONSULTAS.size]
+        }
+        return nombresPais[alfa2] ?: nombresPais[PERU] ?: "Perú"
+    }
+
+    /** alfa-2 → nombre tal como esta en la tabla pais (solo paises que existen; nunca se crean filas). */
+    private val nombresPais: Map<String, String> by lazy {
+        paisGrupoRepository.todosConPais().mapNotNull { g ->
+            val nombre = g.pais.nombre ?: return@mapNotNull null
+            CatalogoPaisesIso.codigo(nombre)?.let { it to nombre }
+        }.toMap()
     }
 
     private fun consulta(
@@ -645,8 +655,9 @@ class DemoInicioService(
         val ahora = reloj.ahora()
         val ids = mutableListOf<Int>()
         // Pais de los fondos (mapa mundial): ~57 % Peru; las altas incluyen 3 paises de alto riesgo GAFI.
-        val grupos = paisGrupoRepository.todosConPais().filter { it.grupo != null }.associateBy { CalculoScoring.normalizar(it.pais.nombre ?: "") }
-        fun paisDe(nombre: String) = grupos[CalculoScoring.normalizar(nombre)] ?: pais
+        val porCodigo = paisGrupoRepository.todosConPais().filter { it.grupo != null }
+            .mapNotNull { g -> CatalogoPaisesIso.codigo(g.pais.nombre)?.let { it to g } }.toMap()
+        fun paisDe(alfa2: String) = porCodigo[alfa2] ?: porCodigo[PERU] ?: pais
         var bajas = 0
         for (k in 0 until 44) {
             // Nivel buscado: Alto (ocupacion y monto en 4: regla de dos factores en 4), Medio o Bajo.
@@ -674,8 +685,8 @@ class DemoInicioService(
                 departamentoOperacionId = depto.id,
                 paisFondosId = when (objetivo) {
                     4 -> paisDe(PAISES_ALTO[(k / 6) % PAISES_ALTO.size])
-                    3 -> paisDe("Perú")
-                    else -> (bajas++).let { b -> if (b % 7 in setOf(0, 2, 4)) paisDe("Perú") else paisDe(PAISES_BAJO[b % PAISES_BAJO.size]) }
+                    3 -> paisDe(PERU)
+                    else -> (bajas++).let { b -> if (b % 7 in setOf(0, 2, 4)) paisDe(PERU) else paisDe(PAISES_BAJO[b % PAISES_BAJO.size]) }
                 }.pais.id
             )
             // Repartidas en los ultimos 30 dias, nunca en el futuro.
